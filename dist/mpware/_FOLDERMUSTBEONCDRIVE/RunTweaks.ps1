@@ -1,4 +1,4 @@
-﻿function RunTweaks($enabledSettings) {
+function RunTweaks($enabledSettings) {
     
     Write-Host '-------------- Applying Tweaks --------------'
     foreach ($setting in $enabledSettings) {
@@ -144,3 +144,4 @@
 
 
 }
+

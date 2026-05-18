@@ -7,3 +7,4 @@ state/
 # Older prototype build artifacts; the current package is dist/mpware/ and dist/mpware.zip.
 dist/mpware.bundle.ps1
 dist/mpware.exe
+

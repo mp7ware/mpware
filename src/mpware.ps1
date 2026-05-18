@@ -1,4 +1,4 @@
-﻿Set-StrictMode -Version 2.0
+Set-StrictMode -Version 2.0
 
 $script:ScriptPath = $PSCommandPath
 $script:AppRoot = Split-Path -Parent $PSScriptRoot
@@ -688,5 +688,6 @@ $script:Window.Add_ContentRendered({
 })
 
 [void]$script:Window.ShowDialog()
+
 
 

@@ -2,13 +2,13 @@ using System;
 using System.IO;
 using System.Diagnostics;
 
-namespace ZoicwareLauncher
+namespace mpwareLauncher
 {
     class Program
     {
         static readonly string LocationCache = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "zLocation.tmp"
+            "mpwareLocation.tmp"
         );
 
         static int Main(string[] args)
@@ -17,7 +17,7 @@ namespace ZoicwareLauncher
 
             if (scriptPath == null)
             {
-                Console.Error.WriteLine("ERROR: ZOICWARE.ps1 not found.");
+                Console.Error.WriteLine("ERROR: mpware.ps1 not found.");
                 Console.Write("Press any key to exit...");
                 Console.ReadKey(true);
                 return 1;
@@ -44,7 +44,7 @@ namespace ZoicwareLauncher
 
             //check relative to the exe's own location first
             string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-            string relative = Path.Combine(exeDir, "_FOLDERMUSTBEONCDRIVE", "ZOICWARE.ps1");
+            string relative = Path.Combine(exeDir, "_FOLDERMUSTBEONCDRIVE", "mpware.ps1");
             if (File.Exists(relative))
             {
                 CacheAndReturn(relative);
@@ -55,7 +55,7 @@ namespace ZoicwareLauncher
             foreach (DriveInfo drive in DriveInfo.GetDrives())
             {
                 if (drive.DriveType != DriveType.Fixed) continue;
-                string found = RecursiveSearch(drive.RootDirectory.FullName, "ZOICWARE.ps1");
+                string found = RecursiveSearch(drive.RootDirectory.FullName, "mpware.ps1");
                 if (found != null)
                 {
                     CacheAndReturn(found);
@@ -130,3 +130,5 @@ namespace ZoicwareLauncher
         }
     }
 }
+
+

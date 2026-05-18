@@ -1,4 +1,4 @@
-﻿param(
+param(
     [switch]$Webview
 )
 
@@ -221,6 +221,7 @@ if ($OS.BuildNumber -gt 19045) {
     Set-ItemProperty -Path $NationPath -Name 'Nation' -Value $OGNationNum -Force
     Set-ItemProperty -Path $NationPath -Name 'Name' -Value $OGNationName -Force
 }
+
 
 
 

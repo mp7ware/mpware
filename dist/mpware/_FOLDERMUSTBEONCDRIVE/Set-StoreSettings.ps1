@@ -1,4 +1,4 @@
-﻿# modified code from https://github.com/agadiffe/WindowsMize
+# modified code from https://github.com/agadiffe/WindowsMize
 
 class UwpRegistryKeyEntry {
     [string] $Path
@@ -163,3 +163,4 @@ $EnableAppInstallNotisReg = @{
 $MicrosoftStoreSettings.Add([PSCustomObject]$EnableAppInstallNotisReg) | Out-Null
 
 Set-UwpAppSetting -Name 'MicrosoftStore' -Setting $MicrosoftStoreSettings
+

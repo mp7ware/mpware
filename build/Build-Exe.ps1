@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [string]$OutputPath,
     [switch]$InstallPs2Exe,
@@ -76,5 +76,6 @@ if ($RequireAdmin) {
 
 & $command @params
 Write-Host "Created executable: $OutputPath"
+
 
 

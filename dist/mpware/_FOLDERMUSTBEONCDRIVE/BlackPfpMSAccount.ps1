@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$pfpPath
 )
  
@@ -22,3 +22,4 @@ if ((Test-Path $publicFolder) -and (Test-Path $regPath)) {
     }
 
 }
+

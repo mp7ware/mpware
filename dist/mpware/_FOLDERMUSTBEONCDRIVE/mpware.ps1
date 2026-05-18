@@ -1,4 +1,4 @@
-﻿If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
+If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
     Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
     Exit	
 }
@@ -241,7 +241,7 @@ if ($null -eq $folder) {
     Write-Warning "Functions NOT Found on $sysDrive" 
     Write-Host
     Write-Host 'Make Sure You Have Downloaded mpware Correctly by Downloading the ZIP File Here: ' -NoNewline -ForegroundColor Cyan
-    Write-Host 'https://github.com/zoicware/ZOICWARE/releases' -ForegroundColor Yellow
+    Write-Host 'https://github.com/MP7BDO/mpware/releases' -ForegroundColor Yellow
     Write-Host 'Press any Key to Exit: '
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
     exit
@@ -452,7 +452,7 @@ function restart-pc {
 
 
 #get icon folder path
-#$Global:iconDir = Search-Directory '*zoicwareIcons'
+#$Global:iconDir = Search-Directory '*mpwareIcons'
 $Global:iconDir = "$folder\mpwareIcons"
 
 
@@ -671,7 +671,7 @@ do {
     $sidebarPanel.Controls.Add($settingsButton)
 
     # Info button in sidebar
-    $urlfeatures = 'https://github.com/zoicware/ZOICWARE/blob/main/features.md'
+    $urlfeatures = 'https://github.com/MP7BDO/mpware/blob/main/features.md'
     $infobutton = New-Object Windows.Forms.Button
     $infobutton.Location = New-Object Drawing.Point(35, 380)
     $infobutton.Size = New-Object Drawing.Size(30, 30)
@@ -940,5 +940,7 @@ do {
 
 # Dispose of the form when it's closed
 $form.Dispose()
+
+
 
 

@@ -1,4 +1,4 @@
-﻿Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
@@ -165,7 +165,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
         $ProgressPreference = 'SilentlyContinue'
 
         if ($checkbox1.Checked) {
-            $sourceUri = 'https://github.com/mpware/ServiceManagerPlus/archive/refs/heads/main.zip'
+            $sourceUri = 'https://github.com/MP7BDO/mpware'
             #check if source code should be included
             $source = $yesCheckboxes[0].Checked
             if ($source) {
@@ -175,7 +175,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             $headers = @{
                 'User-Agent' = 'PowerShell'
             }
-            $apiUrl = 'https://api.github.com/repos/zoicware/ServiceManagerPlus/releases/latest'
+            $apiUrl = 'https://api.github.com/repos/MP7BDO/mpware/releases/latest'
             $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $headers -UseBasicParsing -ErrorAction Stop
             $downloadUrl = $response.assets | Where-Object { $_.name -eq 'ServiceManagerPlus.zip' } | Select-Object -ExpandProperty browser_download_url
             Invoke-WebRequest -Uri $downloadUrl -UseBasicParsing -OutFile "$env:USERPROFILE\Desktop\ServiceManagerPlus.zip"
@@ -195,7 +195,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
         }
 
         if ($checkbox2.Checked) {
-            $sourceUri = 'https://github.com/mpware/WindowsUpdateManager/archive/refs/heads/main.zip'
+            $sourceUri = 'https://github.com/MP7BDO/mpware'
             #check if source code should be included
             $source = $yesCheckboxes[1].Checked
             if ($source) {
@@ -206,7 +206,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             $WshShell = New-Object -comObject WScript.Shell
             $Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\WindowsUpdateManager.lnk")
             $Shortcut.TargetPath = 'powershell.exe'
-            $Shortcut.Arguments = '-ExecutionPolicy Bypass -c iwr https://raw.githubusercontent.com/zoicware/WindowsUpdateManager/main/WindowsUpdateManager.ps1 | iex'
+            $Shortcut.Arguments = '-ExecutionPolicy Bypass -c iwr https://raw.githubusercontent.com/MP7BDO/mpware/WindowsUpdateManager/main/WindowsUpdateManager.ps1 | iex'
             $Shortcut.Save()
             #run as admin
             $bytes = [System.IO.File]::ReadAllBytes($Shortcut.FullName)
@@ -220,7 +220,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
         }
 
         if ($false) {
-            $sourceUri = 'https://raw.githubusercontent.com/zoicware/DefenderProTools/main/StripDefenderV3.ps1'
+            $sourceUri = 'https://raw.githubusercontent.com/MP7BDO/mpware/DefenderProTools/main/StripDefenderV3.ps1'
             #check if source code should be included
             $source = $yesCheckboxes[2].Checked
             if ($source) {
@@ -231,7 +231,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             $WshShell = New-Object -comObject WScript.Shell
             $Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\StripDefender.lnk")
             $Shortcut.TargetPath = 'powershell.exe'
-            $Shortcut.Arguments = '-ExecutionPolicy Bypass -c iwr https://raw.githubusercontent.com/zoicware/DefenderProTools/main/StripDefenderV3.ps1 | iex'
+            $Shortcut.Arguments = '-ExecutionPolicy Bypass -c iwr https://raw.githubusercontent.com/MP7BDO/mpware/DefenderProTools/main/StripDefenderV3.ps1 | iex'
             $Shortcut.Save()
             #run as admin
             $bytes = [System.IO.File]::ReadAllBytes($Shortcut.FullName)
@@ -240,7 +240,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
         }
 
         if ($checkbox4.Checked) {
-            $sourceUri = 'https://raw.githubusercontent.com/zoicware/RepairBadTweaks/main/RepairTweaks.ps1'
+            $sourceUri = 'https://raw.githubusercontent.com/MP7BDO/mpware/RepairBadTweaks/main/RepairTweaks.ps1'
             #check if source code should be included
             $source = $yesCheckboxes[3].Checked
             if ($source) {
@@ -251,7 +251,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             $WshShell = New-Object -comObject WScript.Shell
             $Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\RepairBadTweaks.lnk")
             $Shortcut.TargetPath = 'powershell.exe'
-            $Shortcut.Arguments = '-ExecutionPolicy Bypass -c iwr https://raw.githubusercontent.com/zoicware/RepairBadTweaks/main/RepairTweaks.ps1 | iex'
+            $Shortcut.Arguments = '-ExecutionPolicy Bypass -c iwr https://raw.githubusercontent.com/MP7BDO/mpware/RepairBadTweaks/main/RepairTweaks.ps1 | iex'
             $Shortcut.Save()
             #run as admin
             $bytes = [System.IO.File]::ReadAllBytes($Shortcut.FullName)
@@ -260,7 +260,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
         }
 
         if ($checkbox5.Checked) {
-            $sourceUri = 'https://raw.githubusercontent.com/zoicware/RemoveWindowsAI/main/RemoveWindowsAi.ps1'
+            $sourceUri = 'https://raw.githubusercontent.com/MP7BDO/mpware/RemoveWindowsAI/main/RemoveWindowsAi.ps1'
             #check if source code should be included
             $source = $yesCheckboxes[4].Checked
             if ($source) {
@@ -271,7 +271,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             $WshShell = New-Object -comObject WScript.Shell
             $Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\RemoveWindowsAI.lnk")
             $Shortcut.TargetPath = 'powershell.exe'
-            $Shortcut.Arguments = '-ExecutionPolicy Bypass -c iwr https://raw.githubusercontent.com/zoicware/RemoveWindowsAI/main/RemoveWindowsAi.ps1 | iex'
+            $Shortcut.Arguments = '-ExecutionPolicy Bypass -c iwr https://raw.githubusercontent.com/MP7BDO/mpware/RemoveWindowsAI/main/RemoveWindowsAi.ps1 | iex'
             $Shortcut.Save()
             #run as admin
             $bytes = [System.IO.File]::ReadAllBytes($Shortcut.FullName)
@@ -281,6 +281,9 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
     }
     
 }
+
+
+
 
 
 

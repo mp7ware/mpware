@@ -1,4 +1,4 @@
-﻿function Remove-Locked {
+function Remove-Locked {
     param(
         [string]$selectedLockedPackage
     )
@@ -57,3 +57,4 @@
     foreach ($sid in $users) { foreach ($PackageName in $eol) { Remove-Item "$store\EndOfLife\$sid\$PackageName" -force -ErrorAction SilentlyContinue >'' } }
 
 }
+
