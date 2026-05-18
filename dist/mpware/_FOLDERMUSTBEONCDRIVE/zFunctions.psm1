@@ -1,4 +1,4 @@
-﻿#using module .\CustomCheckedListBoxModule
+#using module .\CustomCheckedListBoxModule
 function debloat {
 
   param (
@@ -1816,7 +1816,7 @@ function debloat {
     } -r 47 -g 49 -b 58 
     $sidebarPanel.Controls.Add($appUninstallBttn)
 
-    $url = 'https://github.com/zoicware/ZOICWARE/blob/main/features.md#debloat'
+    $url = 'https://github.com/MP7BDO/mpware/blob/main/features.md#debloat'
     $infobutton = New-Object Windows.Forms.Button
     $infobutton.Location = New-Object Drawing.Point(5, 480)
     $infobutton.Size = New-Object Drawing.Size(30, 27)
@@ -3220,7 +3220,7 @@ function disable-services {
       
       #disables some unecessary services 
       Write-Status -Message 'Disabling Services...' -Type Output
-      Write-Status -Message 'See Full List: [github.com/zoicware/ZOICWARE/blob/main/features.md#disable-services]' -Type Output   
+      Write-Status -Message 'See Full List: [github.com/MP7BDO/mpware/blob/main/features.md#disable-services]' -Type Output   
        
       Reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Services\BTAGService' /v 'Start' /t REG_DWORD /d '4' /f
       Reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Services\BthAvctpSvc' /v 'Start' /t REG_DWORD /d '4' /f
@@ -3325,7 +3325,7 @@ function gpTweaks {
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
     $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
-    $url = 'https://github.com/zoicware/ZOICWARE/blob/main/features.md#group-policy-tweaks'
+    $url = 'https://github.com/MP7BDO/mpware/blob/main/features.md#group-policy-tweaks'
     $infobutton = New-Object System.Windows.Forms.Button
     $infobutton.Location = New-Object System.Drawing.Point(255, 7)  
     $infobutton.Size = New-Object System.Drawing.Size(30, 27)
@@ -3557,7 +3557,7 @@ function gpTweaks {
 
 
       #block telemetry domains https://learn.microsoft.com/en-us/windows/privacy/configure-windows-diagnostic-data-in-your-organization
-      #also extracted using https://github.com/mpware/zScripts/blob/main/Get-TeleDomains.ps1
+      #also extracted using https://github.com/MP7BDO/mpware
       $domains = @(
         'v10.events.data.microsoft.com'
         'v10c.events.data.microsoft.com'
@@ -3843,7 +3843,7 @@ function import-powerplan {
     $sidebarPanel.Controls.Add($usbPowerBtn)
 
     # Info Button in Sidebar
-    $url = 'https://github.com/zoicware/ZOICWARE/blob/main/features.md#import-and-remove-power-plans'
+    $url = 'https://github.com/MP7BDO/mpware/blob/main/features.md#import-and-remove-power-plans'
     $infobutton = New-Object System.Windows.Forms.Button
     $infobutton.Location = New-Object System.Drawing.Point(5, 480)  
     $infobutton.Size = New-Object System.Drawing.Size(30, 27)
@@ -4010,7 +4010,7 @@ function import-powerplan {
     $powerPlanPanel.Controls.Add($labelCustom)
 
   
-    $checkboxCustomPlan1.Text = "Zoic's Ultimate Performance"
+    $checkboxCustomPlan1.Text = "mpware Ultimate Performance"
     $checkboxCustomPlan1.Location = New-Object System.Drawing.Point(10, 320)
     $checkboxCustomPlan1.Size = New-Object System.Drawing.Size(200, 20)
     if ($Global:enabledOptions -contains 'usePowerPlan') {
@@ -4028,7 +4028,7 @@ function import-powerplan {
     $tooltip1.SetToolTip($checkboxCustomPlan1, 'Provides Optimal Performance for All CPUs with All Power Saving Features Disabled')
     
     $checkboxCustomPlan2 = New-Object System.Windows.Forms.CheckBox
-    $checkboxCustomPlan2.Text = "Zoic's Ultimate Performance (AMD)"
+    $checkboxCustomPlan2.Text = "mpware Ultimate Performance (AMD)"
     $checkboxCustomPlan2.Location = New-Object System.Drawing.Point(10, 350)
     $checkboxCustomPlan2.Size = New-Object System.Drawing.Size(200, 20)
     if ($Global:enabledOptions -contains 'usePowerPlanAMD') {
@@ -4362,7 +4362,7 @@ function import-powerplan {
       }
               
       #imports power plan
-      $p = Search-File '*zoicsultimateperformance.pow'
+      $p = Search-File '*mpwaresultimateperformance.pow'
       
       #generate new guid
       $guid = New-Guid 
@@ -4382,7 +4382,7 @@ function import-powerplan {
       }
               
       #imports power plan
-      $p = Search-File '*zoicsultimateperformanceAMD.pow'
+      $p = Search-File '*mpwaresultimateperformanceAMD.pow'
       
       #generate new guid
       $guid = New-Guid 
@@ -4598,7 +4598,7 @@ function import-reg {
       })
 
     #info button
-    $url = 'https://github.com/zoicware/ZOICWARE/blob/main/features.md#registry-tweaks'
+    $url = 'https://github.com/MP7BDO/mpware/blob/main/features.md#registry-tweaks'
     $infobutton = New-Object Windows.Forms.Button
     $infobutton.Location = New-Object Drawing.Point(740, 10)
     $infobutton.Size = New-Object Drawing.Size(30, 30)
@@ -5989,7 +5989,7 @@ function OptionalTweaks {
     $form.Controls.Add($sidebarPanel)
 
 
-    $url = 'https://github.com/zoicware/ZOICWARE/blob/main/features.md#optional-tweaks'
+    $url = 'https://github.com/MP7BDO/mpware/blob/main/features.md#optional-tweaks'
     $infobutton = New-Object Windows.Forms.Button
     $infobutton.Location = New-Object Drawing.Point(5, 530) # Adjusted to bottom-left of sidebar
     $infobutton.Size = New-Object Drawing.Size(30, 27)
@@ -7102,7 +7102,7 @@ function OptionalTweaks {
               #defender disabled or stripped
             }
 
-            Invoke-RestMethod 'https://github.com/mpware/PBO/archive/refs/heads/main.zip' -OutFile 'C:\PBO.zip'
+            Invoke-RestMethod 'https://github.com/MP7BDO/mpware/archive/refs/heads/main.zip' -OutFile 'C:\PBO.zip'
             Expand-Archive 'C:\PBO.zip' -DestinationPath 'C:\'
             Remove-Item 'C:\PBO.zip' -Recurse -Force
             Expand-Archive 'C:\PBO-main\PBOTuner.zip' -DestinationPath 'C:\Program Files'
@@ -8206,7 +8206,7 @@ function W11Tweaks {
     $sidebarPanel.Controls.Add($miscBtn)
 
     # Info Button (Moved to Bottom-Left of Sidebar)
-    $url = 'https://github.com/zoicware/ZOICWARE/blob/main/features.md#windows-11-tweaks'
+    $url = 'https://github.com/MP7BDO/mpware/blob/main/features.md#windows-11-tweaks'
     $infobutton = New-Object Windows.Forms.Button
     $infobutton.Location = New-Object Drawing.Point(5, 445)    
     $infobutton.Size = New-Object Drawing.Size(30, 27)
@@ -11505,5 +11505,8 @@ function Remove-CBS-Apps {
   
 }
 Export-ModuleMember -Function Remove-CBS-Apps
+
+
+
 
 

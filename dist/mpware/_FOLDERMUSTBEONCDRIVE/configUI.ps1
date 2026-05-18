@@ -1,4 +1,4 @@
-﻿$runtweak = Search-File '*RunTweaks.ps1'
+$runtweak = Search-File '*RunTweaks.ps1'
 .$runtweak
  
 Add-Type -AssemblyName System.Windows.Forms
@@ -37,7 +37,7 @@ $form.Add_Paint({
     })
 
 
-$url = 'https://github.com/zoicware/ZOICWARE/blob/main/features.md#importing-and-exporting-tweaks'
+$url = 'https://github.com/MP7BDO/mpware/blob/main/features.md#importing-and-exporting-tweaks'
 $infobutton = New-Object Windows.Forms.Button
 $infobutton.Location = New-Object Drawing.Point(450, 0)
 $infobutton.Size = New-Object Drawing.Size(30, 27)
@@ -322,6 +322,8 @@ $form.Add_DragDrop({
 
 
 $form.ShowDialog()
+
+
 
 
 

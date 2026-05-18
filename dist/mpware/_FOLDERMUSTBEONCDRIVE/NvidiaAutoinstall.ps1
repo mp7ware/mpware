@@ -1,4 +1,4 @@
-﻿#nvidia driver auto installation script by zoic
+#nvidia driver auto installation script by mpware
 
 If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
     Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
@@ -1659,5 +1659,6 @@ if (!(Check-Internet)) {
 
 
 }
+
 
 

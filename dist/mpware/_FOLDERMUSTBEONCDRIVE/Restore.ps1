@@ -1,4 +1,4 @@
-﻿If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
+If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
   Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
   Exit	
 }
@@ -215,7 +215,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
   if ($checkbox1.Checked) {
 
     [reflection.assembly]::loadwithpartialname('System.Windows.Forms') | Out-Null 
-    $msgBoxInput = [System.Windows.Forms.MessageBox]::Show('Pause Updates First?', 'Zoic', 'YesNo', 'Question')
+    $msgBoxInput = [System.Windows.Forms.MessageBox]::Show('Pause Updates First?', 'mpware', 'YesNo', 'Question')
 
     switch ($msgBoxInput) {
 
@@ -1493,7 +1493,7 @@ $ENABLE_TAMPER_PROTECTION = 1
     }
     #check if it installed
     if (!(Get-AppxPackage 'Microsoft.WindowsStore')) {
-      Write-Status -Message 'Wsreset Did Not Work, Running Zoicware Store Installer...' -Type Output
+      Write-Status -Message 'Wsreset Did Not Work, Running mpware Store Installer...' -Type Output
       $storeDir = Search-Directory '*zWindowsStore'
       $dependencies = @()
       Get-ChildItem $storeDir | ForEach-Object {
@@ -2475,4 +2475,5 @@ Windows Registry Editor Version 5.00
 
 
 }
+
 

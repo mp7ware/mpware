@@ -1,6 +1,6 @@
 # mpware
 
-mpware is a lowercase Windows 11 optimization/debloat package built from the ZOICWARE PowerShell source, rebranded and patched into a portable `mpware.exe` release folder.
+mpware is a lowercase Windows 11 optimization and debloat package with a portable `mpware.exe` release folder.
 
 The current release package is:
 
@@ -12,20 +12,19 @@ Keep the folder structure together. `mpware.exe` is a launcher for the patched P
 
 ## What Is Included
 
-- ZOICWARE PowerShell source converted into a patched `mpware` runtime
+- Patched PowerShell runtime for Windows 11 optimization
 - Registry tweak file, context-menu `.reg` files, restore scripts, driver helpers, cleanup tools, and utilities
-- Generated black/modern placeholder icons because the GitHub source archive does not include ZOICWARE's release icon folder
-- Upstream license/docs in `dist/mpware/third_party/ZOICWARE-attribution`
+- Generated black/modern icon assets
 - A separate safer WPF prototype in `src/`
 
 ## Safety Changes
 
 The runtime intentionally blocks or disables:
 
-- Windows activation/KMS automation
-- One-click Microsoft Defender disabling/stripping
-- Automatic Microsoft Defender exclusions
-- Upstream self-update into ZOICWARE releases
+- Unauthorized activation automation
+- One-click endpoint protection disabling/stripping
+- Automatic endpoint protection exclusions
+- Self-update into a different release channel
 
 Those changes are documented in `dist/mpware/NOTICE.md`.
 
@@ -41,24 +40,23 @@ Use **Run as administrator** for tweaks that need elevated permissions.
 
 ## Build
 
-The upstream-package build script downloads ZOICWARE source into the ignored `vendor/` cache if it is missing, patches it, validates PowerShell syntax, generates placeholder assets, and builds `dist/mpware/mpware.exe` with PS2EXE.
+Refresh the packaged release and zip:
 
 ```powershell
-.\build\Build-UpstreamMpware.ps1
-Compress-Archive -Path .\dist\mpware\* -DestinationPath .\dist\mpware.zip -Force
+.\build\Rebuild-Release.ps1
 ```
 
-The original safer WPF prototype can be built with:
+The WPF prototype can be built with:
 
 ```powershell
 .\build\Build-Exe.ps1
 ```
 
-## Attribution
+## Feature Map
 
-This project vendors and modifies ZOICWARE under its MIT license:
+See `docs/MPWARE_FEATURES.md`.
 
-- https://github.com/zoicware/ZOICWARE
-- https://github.com/zoicware/ZOICWARE/blob/main/features.md
+## Notices
 
-See `THIRD_PARTY_NOTICES.md` and `dist/mpware/third_party/ZOICWARE-attribution/LICENSE`.
+See `THIRD_PARTY_NOTICES.md` for required license notices.
+

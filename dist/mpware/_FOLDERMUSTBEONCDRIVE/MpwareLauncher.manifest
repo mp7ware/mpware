@@ -4,10 +4,10 @@
   <assemblyIdentity
       version="1.0.0.0"
       processorArchitecture="X86"
-      name="ZoicwareLauncher"
+      name="mpwareLauncher"
       type="win32" />
 
-  <description>Zoicware PowerShell Launcher</description>
+  <description>mpware PowerShell Launcher</description>
 
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
@@ -24,3 +24,4 @@
   </compatibility>
 
 </assembly>
+

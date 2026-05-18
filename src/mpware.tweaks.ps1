@@ -1,4 +1,4 @@
-﻿Set-StrictMode -Version 2.0
+Set-StrictMode -Version 2.0
 
 $script:mpwareRoot = Split-Path -Parent $PSScriptRoot
 $script:mpwareStateDir = Join-Path $script:mpwareRoot 'state'
@@ -894,7 +894,7 @@ function New-mpwareLogOnlyTweak {
         }
 }
 
-function Get-mpwareZoicwareParityTweaks {
+function Get-mpwareParityTweaks {
     $consumerAppx = @(
         'Clipchamp.Clipchamp',
         'Microsoft.BingNews',
@@ -939,7 +939,7 @@ function Get-mpwareZoicwareParityTweaks {
         @{ TaskPath = '\Microsoft\Windows\DiskDiagnostic\'; TaskName = 'Microsoft-Windows-DiskDiagnosticDataCollector' }
     )
 
-    $zoicwareServices = @(
+    $mpwareServices = @(
         'Fax',
         'RemoteRegistry',
         'MapsBroker',
@@ -970,7 +970,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Group Policy' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'ZOICWARE has a full disable-updates option. mpware uses a safer policy that stops surprise installs while keeping Windows Update available.' `
+            -Description 'mpware uses a safer policy that stops surprise installs while keeping Windows Update available.' `
             -ApplySummary 'Sets Windows Update AU policy to notify before download/install.' `
             -UndoSummary 'Restores the previous policy values captured before applying.' `
             -Apply {
@@ -996,7 +996,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Id 'gp-defender-disable-blocked' `
             -Name 'Group Policy: disable Microsoft Defender' `
             -Category 'Group Policy' `
-            -Description 'ZOICWARE includes a Defender disable path. mpware shows it for parity but does not automate disabling core endpoint protection.' `
+            -Description 'mpware shows the Defender-disable category for visibility but does not automate disabling core endpoint protection.' `
             -Reason 'Disabling Defender can leave the machine exposed. mpware will not ship a one-click action that turns off built-in security protection.'
 
         New-mpwareTweak `
@@ -1005,7 +1005,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Group Policy' `
             -Risk 'Low' `
             -RequiresAdmin $true `
-            -Description 'Applies the same telemetry-reduction intent as ZOICWARE without hosts-file blocking.' `
+            -Description 'Applies telemetry-reduction settings without hosts-file blocking.' `
             -ApplySummary 'Limits optional diagnostic data and disables selected CEIP/appraiser scheduled tasks.' `
             -UndoSummary 'Restores the policy registry values and task states captured before applying.' `
             -Apply {
@@ -1036,7 +1036,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Scheduled Tasks' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'ZOICWARE removes broad scheduled task sets. mpware disables a targeted telemetry-related task bundle and saves restore state.' `
+            -Description 'mpware disables a targeted telemetry-related task bundle and saves restore state.' `
             -ApplySummary 'Disables selected Application Experience, CEIP, and DiskDiagnostic scheduled tasks.' `
             -UndoSummary 'Restores each task enabled state captured before applying.' `
             -Apply {
@@ -1052,24 +1052,24 @@ function Get-mpwareZoicwareParityTweaks {
             }
 
         New-mpwareTweak `
-            -Id 'services-zoicware-manual' `
-            -Name 'ZOICWARE-style service cleanup' `
+            -Id 'services-mpware-manual' `
+            -Name 'mpware service cleanup' `
             -Category 'Services' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Sets the non-core services commonly targeted by ZOICWARE to Manual instead of hard-disabling everything.' `
+            -Description 'Sets the non-core services commonly adjusted for lean Windows installs to Manual instead of hard-disabling everything.' `
             -ApplySummary 'Changes selected service startup types to Manual and records previous states.' `
             -UndoSummary 'Restores each captured service startup type.' `
             -Apply {
                 param([bool]$DryRun, [scriptblock]$Log)
-                Invoke-mpwareServiceStartup -TweakId 'services-zoicware-manual' -Services $zoicwareServices -StartupType 'Manual' -StopRunning $false -DryRun $DryRun -Log $Log
+                Invoke-mpwareServiceStartup -TweakId 'services-mpware-manual' -Services $mpwareServices -StartupType 'Manual' -StopRunning $false -DryRun $DryRun -Log $Log
             } `
             -Undo {
                 param([bool]$DryRun, [scriptblock]$Log)
-                Restore-mpwareServiceStartup -TweakId 'services-zoicware-manual' -DryRun $DryRun -Log $Log
+                Restore-mpwareServiceStartup -TweakId 'services-mpware-manual' -DryRun $DryRun -Log $Log
             } `
             -GetState {
-                Test-mpwareServicesStartupType -Services $zoicwareServices -StartupType 'Manual'
+                Test-mpwareServicesStartupType -Services $mpwareServices -StartupType 'Manual'
             }
 
         New-mpwareTweak `
@@ -1077,7 +1077,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Debloat preset: all non-core apps' `
             -Category 'Debloat' `
             -Risk 'High' `
-            -Description 'Matches ZOICWARE preset coverage in a safer current-user AppX removal path. Edge and Store removal are not forced.' `
+            -Description 'Uses a safer current-user AppX removal path. Edge and Store removal are not forced.' `
             -ApplySummary 'Removes common consumer, Xbox, Teams, and OneDrive AppX packages for the current user.' `
             -UndoSummary 'AppX undo is package-dependent; reinstall from Microsoft Store or winget as needed.' `
             -Apply {
@@ -1097,7 +1097,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Debloat preset: keep Store, Xbox, Edge' `
             -Category 'Debloat' `
             -Risk 'Medium' `
-            -Description 'ZOICWARE-style preset that removes consumer apps while keeping Store, Xbox, and Edge.' `
+            -Description 'mpware preset that removes consumer apps while keeping Store, Xbox, and Edge.' `
             -ApplySummary 'Removes common consumer AppX packages for the current user.' `
             -UndoSummary 'Reinstall removed packages from Microsoft Store or winget if needed.' `
             -Apply {
@@ -1117,7 +1117,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Debloat preset: keep Store and Xbox' `
             -Category 'Debloat' `
             -Risk 'Medium' `
-            -Description 'ZOICWARE-style preset that keeps Store and Xbox while removing consumer apps and Teams/OneDrive AppX entries.' `
+            -Description 'mpware preset that keeps Store and Xbox while removing consumer apps and Teams/OneDrive AppX entries.' `
             -ApplySummary 'Removes consumer and Teams/OneDrive AppX packages for the current user.' `
             -UndoSummary 'Reinstall removed packages from Microsoft Store or winget if needed.' `
             -Apply {
@@ -1137,7 +1137,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Debloat preset: keep Edge' `
             -Category 'Debloat' `
             -Risk 'High' `
-            -Description 'ZOICWARE-style preset that keeps Edge while removing consumer, Xbox, and Teams/OneDrive AppX entries.' `
+            -Description 'mpware preset that keeps Edge while removing consumer, Xbox, and Teams/OneDrive AppX entries.' `
             -ApplySummary 'Removes consumer, Xbox, and Teams/OneDrive AppX packages for the current user.' `
             -UndoSummary 'Reinstall removed packages from Microsoft Store or winget if needed.' `
             -Apply {
@@ -1157,7 +1157,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Debloat preset: keep Store' `
             -Category 'Debloat' `
             -Risk 'High' `
-            -Description 'ZOICWARE-style preset that keeps Store while removing consumer, Xbox, and Teams/OneDrive AppX entries.' `
+            -Description 'mpware preset that keeps Store while removing consumer, Xbox, and Teams/OneDrive AppX entries.' `
             -ApplySummary 'Removes consumer, Xbox, and Teams/OneDrive AppX packages for the current user.' `
             -UndoSummary 'Reinstall removed packages from Microsoft Store or winget if needed.' `
             -Apply {
@@ -1177,7 +1177,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Custom debloat picker' `
             -Category 'Debloat' `
             -Risk 'Medium' `
-            -Description 'Feature parity placeholder for ZOICWARE custom AppX/capability/package picker.' `
+            -Description 'Guided placeholder for mpware custom AppX/capability/package picker.' `
             -ApplySummary 'Lists the custom picker workflow that should become a dedicated picker dialog.' `
             -Lines @('Planned: enumerate AppX packages, capabilities, optional features, and installed programs in a selectable dialog.', 'Current build: use individual debloat presets or add a new package array in mpware.tweaks.ps1.')
 
@@ -1186,7 +1186,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Optional: black Windows theme' `
             -Category 'Optional' `
             -Risk 'Low' `
-            -Description 'Applies the ZOICWARE black theme idea with Windows dark app/system mode and black accent settings.' `
+            -Description 'Applies the mpware black theme idea with Windows dark app/system mode and black accent settings.' `
             -ApplySummary 'Sets current-user theme and accent registry values.' `
             -UndoSummary 'Restores the previous registry values captured before applying.' `
             -Apply {
@@ -1216,7 +1216,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Optional' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Prevents driver delivery through Windows Update, matching one of ZOICWARE optional update controls.' `
+            -Description 'Prevents driver delivery through Windows Update, matching one of mpware optional update controls.' `
             -ApplySummary 'Sets ExcludeWUDriversInQualityUpdate policy to 1.' `
             -UndoSummary 'Restores the previous policy value captured before applying.' `
             -Apply {
@@ -1243,7 +1243,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Optional' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Reduces shutdown wait time and auto-ends foreground apps, inspired by ZOICWARE optional tweaks.' `
+            -Description 'Reduces shutdown wait time and auto-ends foreground apps, inspired by mpware optional tweaks.' `
             -ApplySummary 'Sets WaitToKillServiceTimeout, AutoEndTasks, HungAppTimeout, and WaitToKillAppTimeout.' `
             -UndoSummary 'Restores previous registry values captured before applying.' `
             -Apply {
@@ -1273,7 +1273,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Optional' `
             -Risk 'High' `
             -RequiresAdmin $true `
-            -Description 'Tracks the rest of ZOICWARE optional tweaks: transparent taskbar, Razer/ASUS blocking, PBO startup, PowerShell logging, no GUI boot, backup app removal, time server, mouse acceleration, and device encryption.' `
+            -Description 'Tracks the rest of mpware optional tweaks: transparent taskbar, Razer/ASUS blocking, PBO startup, PowerShell logging, no GUI boot, backup app removal, time server, mouse acceleration, and device encryption.' `
             -ApplySummary 'Logs the advanced optional actions for manual review before implementing them one by one.' `
             -Lines @('Covered upstream options: transparent taskbar, remove network icon, recycle-bin label cleanup, remove mouse/sound schemes, hide user tile, modern cursor, dark/classic accents, update deferrals, block OEM download servers, PBO startup, no GUI boot, Game Bar popup, Backup app removal, time server, desktop mouse accel, device encryption.', 'These should be split into individual reversible registry/service/package actions before enabling automatic apply.')
 
@@ -1283,7 +1283,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Context Menu' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE add-to-context-menu actions.' `
+            -Description 'mpware coverage for add-to-context-menu actions.' `
             -ApplySummary 'Documents context entries to add: new script files, PowerShell options, snipping, shutdown, run as admin, CMD/PowerShell, kill tasks, permanent delete, and take ownership.' `
             -Lines @('Planned add entries: New .reg/.ps1/.bat files, PS1 open/run options, Snipping Tool, Shutdown, Run as Admin for scripts, Open CMD/PowerShell, Kill Not Responding Tasks, Delete Permanently, Take Ownership.', 'Context-menu changes are registry-heavy and should be implemented as separate reversible actions.')
 
@@ -1293,7 +1293,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Context Menu' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE remove-from-context-menu actions.' `
+            -Description 'mpware coverage for remove-from-context-menu actions.' `
             -ApplySummary 'Documents context entries to remove: favorites, customize, give access, terminal, previous versions, print, send to, share, personalize, display, extract all, compatibility, and library.' `
             -Lines @('Planned remove entries: Add to Favorites, Customize Folder, Give Access To, Open in Terminal, Restore Previous Versions, Print, Send To, Share, Personalize, Display Settings, Extract All, Troubleshoot Compatibility, Include in Library.', 'These should be implemented as separate reversible registry actions.')
 
@@ -1303,7 +1303,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Power Plans' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE importing a custom performance power plan.' `
+            -Description 'mpware coverage for importing a custom performance power plan.' `
             -ApplySummary 'Logs the custom plan import workflow until a .pow plan is bundled.' `
             -Lines @('Planned: include a .pow plan, import with powercfg -import, capture previous active scheme, then activate the imported plan.')
 
@@ -1313,7 +1313,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Power Plans' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE hidden plans: Ultimate Performance, Max Performance Overlay, and High Performance Overlay.' `
+            -Description 'mpware coverage for hidden plans: Ultimate Performance, Max Performance Overlay, and High Performance Overlay.' `
             -ApplySummary 'Ultimate Performance is implemented separately; this action tracks the remaining overlay plan work.' `
             -Lines @('Ultimate Performance is available in the Performance tab.', 'Planned: add Max Performance Overlay and High Performance Overlay activation with previous-plan restore.')
 
@@ -1323,7 +1323,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Power Plans' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE USB hub/device power saving tweaks.' `
+            -Description 'mpware coverage for USB hub/device power saving tweaks.' `
             -ApplySummary 'Logs the USB device picker workflow.' `
             -Lines @('Planned: enumerate USB hubs/devices, show a picker, and disable Allow the computer to turn off this device to save power with restore data.')
 
@@ -1333,7 +1333,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Windows 11' `
             -Risk 'High' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE ExplorerPatcher/OpenShell/rounded-corner/Win10 shell restoration actions.' `
+            -Description 'mpware coverage for ExplorerPatcher/OpenShell/rounded-corner/Win10 shell restoration actions.' `
             -ApplySummary 'Logs the shell patch workflow instead of silently installing third-party shell patchers.' `
             -Lines @('Covered upstream options: remove rounded edges, Windows 10 taskbar/start menu, Windows 10 Explorer ribbon, replace Start/Search with OpenShell.', 'mpware will not silently download shell patchers; add vendor links or bundled checksums before enabling.')
 
@@ -1397,7 +1397,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Windows 11' `
             -Risk 'High' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE Win10 recycle bin, snipping tool, task manager, notepad, icons, sounds, dark winver, quick settings, labels, mouse throttle, and Start menu variants.' `
+            -Description 'mpware coverage for Win10 recycle bin, snipping tool, task manager, notepad, icons, sounds, dark winver, quick settings, labels, mouse throttle, and Start menu variants.' `
             -ApplySummary 'Logs the Windows 10 asset restoration workflow.' `
             -Lines @('Covered upstream options: Win10 recycle bin icon, Snipping Tool, Task Manager wrapper, legacy Notepad, Win10 icons, Win10 sounds, dark winver, quick settings tiles, system labels, mouse throttle, new Start menu toggles.', 'These need bundled assets/checksums and individual restore paths before automatic apply.')
 
@@ -1406,7 +1406,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Install packages: runtimes essentials' `
             -Category 'Install' `
             -Risk 'Medium' `
-            -Description 'ZOICWARE installs DirectX, Visual C++ runtimes, and .NET 3.5. mpware starts with winget-based runtime helpers where available.' `
+            -Description 'mpware can install DirectX, Visual C++ runtimes, and .NET 3.5. mpware starts with winget-based runtime helpers where available.' `
             -ApplySummary 'Requests winget installs for common Visual C++ runtime packages.' `
             -UndoSummary 'Installed runtime packages are managed by Windows Apps/Settings.' `
             -Apply {
@@ -1426,7 +1426,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Install browsers' `
             -Category 'Install' `
             -Risk 'Low' `
-            -Description 'Feature parity for the ZOICWARE browser installer.' `
+            -Description 'Feature parity for the mpware browser installer.' `
             -ApplySummary 'Requests winget installs for Firefox and Google Chrome.' `
             -UndoSummary 'Browsers are removed through Windows Settings or winget uninstall.' `
             -Apply {
@@ -1447,7 +1447,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Install' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE network driver workflow.' `
+            -Description 'mpware coverage for network driver workflow.' `
             -ApplySummary 'Logs online/offline network driver search and QoS helper workflow.' `
             -Lines @('Planned: detect adapter vendor, link to vendor driver page or local driver pack, and offer reversible QoS settings.', 'mpware does not bundle drivers yet.')
 
@@ -1457,7 +1457,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Install' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE NVIDIA installer and post-install tweaks.' `
+            -Description 'mpware coverage for NVIDIA installer and post-install tweaks.' `
             -ApplySummary 'Logs NVIDIA driver selection, strip-driver, HDCP, telemetry, MSI mode, vibrance, and monitor-speaker workflow.' `
             -Lines @('Planned: query NVIDIA releases, select version, install driver, optional strip components, import NVCP settings, MSI mode, vibrance, monitor speakers.', 'mpware does not download GPU drivers yet.')
 
@@ -1467,7 +1467,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Restore' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Matches ZOICWARE restore option for reinstalling Microsoft Store.' `
+            -Description 'Matches mpware restore option for reinstalling Microsoft Store.' `
             -ApplySummary 'Runs wsreset -i.' `
             -UndoSummary 'No automatic undo; Store can be removed only through separate debloat workflows.' `
             -Apply {
@@ -1483,12 +1483,12 @@ function Get-mpwareZoicwareParityTweaks {
             }
 
         New-mpwareLogOnlyTweak `
-            -Id 'restore-zoicware-bundle' `
-            -Name 'Restore: ZOICWARE restore bundle' `
+            -Id 'restore-mpware-bundle' `
+            -Name 'Restore: mpware restore bundle' `
             -Category 'Restore' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE restore screen.' `
+            -Description 'mpware coverage for restore screen.' `
             -ApplySummary 'Documents restore options: enable updates, enable Defender, enable services, repair Xbox apps, disable QoS upload, unblock OEM downloads, unpause updates, restore default context menu, remove dark winver, and revert registry tweaks.' `
             -Lines @('mpware already has per-tweak undo for actions it applies.', 'Planned broad restore actions: enable updates, enable services, repair Xbox apps, disable QoS upload, unblock Razer/ASUS hosts, unpause updates, restore context menu, remove dark winver, revert imported registry tweaks.')
 
@@ -1498,7 +1498,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Cleanup' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Implements the least risky part of ZOICWARE Ultimate Cleanup: temp folders and recycle bin.' `
+            -Description 'Implements the least risky part of mpware Ultimate Cleanup: temp folders and recycle bin.' `
             -ApplySummary 'Deletes files under user/system temp folders and empties the recycle bin.' `
             -UndoSummary 'Deleted temporary files cannot be automatically restored.' `
             -Apply {
@@ -1519,7 +1519,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Cleanup' `
             -Risk 'High' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for the rest of ZOICWARE cleanup: event logs, Windows.old, duplicate drivers, cleanmgr, shader cache, update cleanup, and error reports.' `
+            -Description 'Feature parity for the rest of mpware cleanup: event logs, Windows.old, duplicate drivers, cleanmgr, shader cache, update cleanup, and error reports.' `
             -ApplySummary 'Logs advanced cleanup areas for manual review.' `
             -Lines @('Covered upstream areas: event viewer logs, Windows logs, NVIDIA shader cache, Windows.old, duplicate drivers, disk cleanup on all drives, update cleanup, WER files, old chkdsk files, feedback hub archive, diagnostic viewer DB, device driver packages.', 'These are intentionally split from basic cleanup because some are destructive or slow.')
 
@@ -1529,7 +1529,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Utilities' `
             -Risk 'Medium' `
             -RequiresAdmin $true `
-            -Description 'Runs the same kind of repair utility exposed in ZOICWARE: DISM restore health followed by SFC.' `
+            -Description 'Runs the same kind of repair utility exposed in mpware: DISM restore health followed by SFC.' `
             -ApplySummary 'Runs DISM and SFC repair commands.' `
             -UndoSummary 'No undo is needed; these are repair scans.' `
             -Apply {
@@ -1549,7 +1549,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Name 'Utility: restart Explorer' `
             -Category 'Utilities' `
             -Risk 'Low' `
-            -Description 'Restarts explorer.exe, matching the ZOICWARE utility action.' `
+            -Description 'Restarts explorer.exe, matching the mpware utility action.' `
             -ApplySummary 'Stops and restarts explorer.exe.' `
             -UndoSummary 'No undo is needed.' `
             -Apply {
@@ -1570,7 +1570,7 @@ function Get-mpwareZoicwareParityTweaks {
             -Category 'Utilities' `
             -Risk 'High' `
             -RequiresAdmin $true `
-            -Description 'Feature parity for ZOICWARE restart-to-BIOS action.' `
+            -Description 'mpware coverage for restart-to-BIOS action.' `
             -ApplySummary 'Logs the firmware reboot command instead of immediately restarting the PC from a batch action.' `
             -Lines @('Manual command: shutdown /r /fw /t 0', 'This should stay behind a confirmation dialog because it immediately reboots to firmware settings.')
 
@@ -1578,14 +1578,14 @@ function Get-mpwareZoicwareParityTweaks {
             -Id 'activation-kms-blocked' `
             -Name 'Activate Windows' `
             -Category 'Blocked' `
-            -Description 'ZOICWARE includes KMS activation tooling. mpware lists the feature for parity but will not implement unauthorized activation.' `
+            -Description 'mpware does not implement unauthorized activation tooling.' `
             -Reason 'Windows activation bypass/KMS tooling is not included. Use a valid Microsoft license or legitimate organization activation.'
 
         New-mpwareBlockedTweak `
             -Id 'install-remote-scripts-blocked' `
             -Name 'Install other remote scripts' `
             -Category 'Blocked' `
-            -Description 'ZOICWARE can create shortcuts to run remote scripts from GitHub. mpware does not auto-run remote code.' `
+            -Description 'mpware does not auto-run mutable remote code.' `
             -Reason 'Running mutable remote scripts without pinning commits or checksums is unsafe. Add pinned sources and review prompts before enabling.'
     )
 }
@@ -1965,7 +1965,10 @@ function Get-mpwareTweaks {
             }
     )
 
-    return @($baseTweaks + (Get-mpwareZoicwareParityTweaks))
+    return @($baseTweaks + (Get-mpwareParityTweaks))
 }
+
+
+
 
 

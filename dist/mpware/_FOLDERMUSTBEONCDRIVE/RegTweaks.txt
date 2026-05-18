@@ -1091,3 +1091,4 @@ Windows Registry Editor Version 5.00
 ; Disable show me suggested apps in share
 [HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\CDP]
 "EnablePromotionalAppsForShare"=dword:00000000
+

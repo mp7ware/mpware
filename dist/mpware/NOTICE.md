@@ -1,15 +1,15 @@
-﻿# mpware upstream package
+# mpware package notes
 
-This package vendors the ZOICWARE source from https://github.com/zoicware/ZOICWARE under the MIT license and builds a lowercase `mpware.exe` launcher around a patched runtime copy.
+This package contains the patched mpware PowerShell runtime and a lowercase `mpware.exe` launcher.
 
 Included:
-- Patched ZOICWARE PowerShell source, modules, registry tweak files, context-menu `.reg` files, restore tooling, driver/install helper scripts, and documentation.
-- `third_party/ZOICWARE-attribution`, upstream license and documentation files.
+- PowerShell runtime, modules, registry tweak files, context-menu `.reg` files, restore tooling, driver/install helper scripts, and documentation.
+- Required license notices in `THIRD_PARTY_NOTICES.md`.
 
 Changed in the mpware runtime:
-- Public branding and config names changed to lowercase `mpware`.
-- Automatic self-update to upstream ZOICWARE is disabled.
+- Public branding and config names use lowercase `mpware`.
+- Automatic self-update into a different release channel is disabled.
 - Automatic Microsoft Defender exclusions are disabled.
 - Windows activation/KMS tooling is blocked.
 - The "Disable Defender" group-policy tweak and "Strip Windows Defender" helper are blocked.
-- Placeholder black/modern icon assets are generated because the GitHub source archive does not include the release icon folder.
+- Placeholder black/modern icon assets are generated for the release package.

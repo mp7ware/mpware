@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -20,3 +20,4 @@ if ($isAdmin) {
 else {
     Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WorkingDirectory (Split-Path -Parent $script) -Verb RunAs -Wait
 }
+

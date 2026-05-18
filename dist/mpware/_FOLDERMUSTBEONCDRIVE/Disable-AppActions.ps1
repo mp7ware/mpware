@@ -1,4 +1,4 @@
-﻿function Set-UwpAppRegistryEntry {
+function Set-UwpAppRegistryEntry {
     # modified to work in windows powershell from https://github.com/agadiffe/WindowsMize/blob/fe78912ccb1c83d440bd2123f5e43a6156fab31a/src/modules/applications/settings/public/Set-UwpAppSetting.ps1
     <# 
     .SYNOPSIS
@@ -140,3 +140,4 @@ if (Test-Path $settingsDat) {
     }
      
 }
+
