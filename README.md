@@ -1,6 +1,6 @@
 # mpware
 
-mpware is a lowercase Windows 11 optimization and debloat package with a portable `mpware.exe` release folder.
+mpware is a Windows 11 optimization and debloat package with a portable `mpware.exe` release folder.
 
 The current release package is:
 
@@ -17,14 +17,6 @@ Keep the folder structure together. `mpware.exe` is a launcher for the patched P
 - Generated black/modern icon assets
 - A separate safer WPF prototype in `src/`
 
-## Safety Changes
-
-The runtime intentionally blocks or disables:
-
-- Unauthorized activation automation
-- One-click endpoint protection disabling/stripping
-- Automatic endpoint protection exclusions
-- Self-update into a different release channel
 
 Those changes are documented in `dist/mpware/NOTICE.md`.
 
