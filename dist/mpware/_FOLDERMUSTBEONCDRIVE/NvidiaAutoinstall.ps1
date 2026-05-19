@@ -7,6 +7,37 @@ If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 
 $Global:tempDir = (([System.IO.Path]::GetTempPath())).trimend('\')
 
+function Disable-ConsoleQuickEdit {
+    try {
+        if (-not ('ConsoleMode.NativeMethods' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace ConsoleMode {
+    public static class NativeMethods {
+        [DllImport("kernel32.dll", SetLastError=true)]
+        public static extern IntPtr GetStdHandle(int nStdHandle);
+        [DllImport("kernel32.dll", SetLastError=true)]
+        public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out int lpMode);
+        [DllImport("kernel32.dll", SetLastError=true)]
+        public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int dwMode);
+    }
+}
+'@
+        }
+        $handle = [ConsoleMode.NativeMethods]::GetStdHandle(-10)
+        $mode = 0
+        if ([ConsoleMode.NativeMethods]::GetConsoleMode($handle, [ref]$mode)) {
+            $quickEdit = 0x0040
+            $extendedFlags = 0x0080
+            $newMode = ($mode -bor $extendedFlags) -band (-bnot $quickEdit)
+            [ConsoleMode.NativeMethods]::SetConsoleMode($handle, $newMode) | Out-Null
+        }
+    }
+    catch {}
+}
+Disable-ConsoleQuickEdit
+
 function Download-AppxPackage {
     param(
         # there has to be an alternative, as sometimes the API fails on PackageFamilyName
@@ -1068,14 +1099,19 @@ if (!(Check-Internet)) {
 
     Write-Status -message 'Fixing Nvidia DRS Folder...' -type Output
     $path = "$env:ProgramData\NVIDIA Corporation\Drs"
-    (Get-ChildItem -Path $path).FullName | Foreach-Object { Unblock-File $_ }
+    if (Test-Path -LiteralPath $path) {
+        Get-ChildItem -LiteralPath $path -ErrorAction SilentlyContinue | ForEach-Object { Unblock-File $_.FullName -ErrorAction SilentlyContinue }
+    }
+    else {
+        Write-Status -message "NVIDIA DRS folder was not found at $path. This can happen before the NVIDIA driver/control panel initializes, or inside a VM without NVIDIA GPU passthrough/vGPU. Continuing without DRS cleanup." -type Warning
+    }
 
     #removes tray icon
     Reg.exe add 'HKCU\SOFTWARE\NVIDIA Corporation\NvTray' /v 'StartOnLogin' /t REG_DWORD /d '0' /f
     #new way
     Reg.exe add 'HKLM\SYSTEM\ControlSet001\Services\nvlddmkm\Parameters\Global\Startup\ForceStopNvTrayIcon' /ve /t REG_DWORD /d '1' /f
     Reg.exe add 'HKLM\SYSTEM\ControlSet001\Services\nvlddmkm\Parameters\Global\Startup\StartNvTray' /ve /t REG_DWORD /d '0' /f
-    $keys = Get-ChildItem -path 'HKCU:\Control Panel\NotifyIconSettings'
+    $keys = Get-ChildItem -path 'HKCU:\Control Panel\NotifyIconSettings' -ErrorAction SilentlyContinue
     foreach ($key in $keys) {
         $props = Get-ItemProperty $key.PSPath
         if ($props.executablepath -like '*NVDisplay.Container*') {
@@ -1086,8 +1122,8 @@ if (!(Check-Internet)) {
     #getting monitor ids and adding them to an array
     $monitorDevices = pnputil /enum-devices | Select-String -Pattern 'DISPLAY'
 
+    $dList = @()
     if ($monitorDevices) {
-        $dList = @()
     
         foreach ($device in $monitorDevices) {
             $deviceId = $device.ToString() -replace '^.*?DISPLAY\\(.*?)\\.*$', '$1'
@@ -1106,7 +1142,7 @@ if (!(Check-Internet)) {
     #adding saturation reg key paths to an array
     $paths = @()
     for ($i = 0; $i -lt $dList.Length; $i++) {
-        $paths += Get-ChildItem -Path 'registry::HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\nvlddmkm\State\DisplayDatabase\' | Where-Object { $_.Name -like "*$($dList[$i])*" } | Select-Object -First 1
+        $paths += Get-ChildItem -Path 'registry::HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\nvlddmkm\State\DisplayDatabase\' -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*$($dList[$i])*" } | Select-Object -First 1
 
     }
  
@@ -1548,36 +1584,46 @@ if (!(Check-Internet)) {
             else {
                 $stockNip = Search-File '*DefaultProfile.nip'
             }
-            $dirPath = Split-Path $stockNip -Parent
-            #just to be sure
-            Remove-Item "$dirPath\Custom.nip" -Force -ErrorAction SilentlyContinue
-            Copy-Item $stockNip -Destination "$dirPath\Custom.nip" -Force
-
-            if ($radioButton1.Checked) {
-                #enable rebar
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983226' -settingValue '1' -valueType 'Dword'
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983227' -settingValue '1' -valueType 'Dword'
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983295' -settingValue 'AAAAQAAAAAA=' -valueType 'Binary'
+            if (-not $stockNip -or -not (Test-Path -LiteralPath $stockNip)) {
+                Write-Status -message 'NVIDIA profile import skipped: DefaultProfile.nip was not found. Select a .nip file to import custom Inspector settings.' -type Warning
             }
-            if ($radioButton2.Checked) {
-                #enable gsync
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '278196567' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Toggle the VRR global feature'
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '278196727' -settingValue '1' -valueType 'Dword' -settingNameInfo 'VRR requested state'
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '279476687' -settingValue '0' -valueType 'Dword' -settingNameInfo 'G-SYNC'
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '294973784' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Enable G-SYNC globally'
-            }
+            else {
+                $dirPath = Split-Path $stockNip -Parent
+                #just to be sure
+                Remove-Item "$dirPath\Custom.nip" -Force -ErrorAction SilentlyContinue
+                Copy-Item $stockNip -Destination "$dirPath\Custom.nip" -Force
 
-            if ($radioButton3.Checked) {
-                #enable dlss latest
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '283385331' -settingValue '16777215' -valueType 'Dword' -settingNameInfo 'Override DLSS-SR presets'
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '283385345' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Enable DLSS-SR override'
-                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '6505105' -settingValue '1' -valueType 'Dword' -settingNameInfo 'DLSS Model Preset Profile'
-            }          
+                if ($radioButton1.Checked) {
+                    #enable rebar
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983226' -settingValue '1' -valueType 'Dword'
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983227' -settingValue '1' -valueType 'Dword'
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983295' -settingValue 'AAAAQAAAAAA=' -valueType 'Binary'
+                }
+                if ($radioButton2.Checked) {
+                    #enable gsync
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '278196567' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Toggle the VRR global feature'
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '278196727' -settingValue '1' -valueType 'Dword' -settingNameInfo 'VRR requested state'
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '279476687' -settingValue '0' -valueType 'Dword' -settingNameInfo 'G-SYNC'
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '294973784' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Enable G-SYNC globally'
+                }
+
+                if ($radioButton3.Checked) {
+                    #enable dlss latest
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '283385331' -settingValue '16777215' -valueType 'Dword' -settingNameInfo 'Override DLSS-SR presets'
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '283385345' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Enable DLSS-SR override'
+                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '6505105' -settingValue '1' -valueType 'Dword' -settingNameInfo 'DLSS Model Preset Profile'
+                }
            
-            $inspector = Search-File '*nvidiaProfileInspector.exe'
+                $inspector = Search-File '*nvidiaProfileInspector.exe'
+                if (-not $inspector -or -not (Test-Path -LiteralPath $inspector)) {
+                    Write-Status -message 'NVIDIA profile import skipped: nvidiaProfileInspector.exe was not found.' -type Warning
+                }
+                else {
         
-            $arguments = '-silentImport', '-silent', "$dirPath\Custom.nip"
-            & $inspector $arguments | Wait-Process
+                    $arguments = '-silentImport', '-silent', "$dirPath\Custom.nip"
+                    & $inspector $arguments | Wait-Process
+                }
+            }
 
             
         }
