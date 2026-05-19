@@ -105,6 +105,7 @@ namespace mpwareLauncher
             nav.Children.Add(NavButton("Registry Tweaks", ShowRegistryTweaks));
             nav.Children.Add(NavButton("NVIDIA Driver", ShowNvidiaDriver));
             nav.Children.Add(NavButton("Debloater", ShowDebloater));
+            nav.Children.Add(NavButton("Restore Tweaks", ShowRestoreTweaks));
             nav.Children.Add(NavButton("About", ShowAbout));
 
             _content = new Grid();
@@ -268,8 +269,13 @@ namespace mpwareLauncher
             description.Margin = new Thickness(0, 5, 0, 10);
             body.Children.Add(description);
 
-            TextBlock path = Text(">  REGISTRY PATH", 10, FontWeights.Normal, _muted);
-            path.ToolTip = RegistryPreview(tweak);
+            Button path = FlatButton(">  REGISTRY PATCH", false);
+            path.Height = 24;
+            path.MinWidth = 142;
+            path.Padding = new Thickness(8, 0, 8, 0);
+            path.HorizontalAlignment = HorizontalAlignment.Left;
+            path.ToolTip = "Click to show full registry paths, values, and descriptions.";
+            path.Click += delegate { ShowRegistryPatch(tweak); };
             body.Children.Add(path);
 
             return card;
@@ -287,6 +293,64 @@ namespace mpwareLauncher
             pill.Padding = new Thickness(6, 2, 6, 2);
             pill.Child = Text(risk.ToUpperInvariant(), 9, FontWeights.Bold, _background);
             return pill;
+        }
+
+        private void ShowRegistryPatch(TweakItem tweak)
+        {
+            Window dialog = new Window();
+            dialog.Title = "mpware - registry patch";
+            dialog.Owner = this;
+            dialog.Width = 820;
+            dialog.Height = 560;
+            dialog.MinWidth = 640;
+            dialog.MinHeight = 420;
+            dialog.Background = _background;
+            dialog.Foreground = _text;
+            dialog.FontFamily = _mono;
+            dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            dialog.UseLayoutRounding = true;
+            dialog.SnapsToDevicePixels = true;
+
+            Grid root = new Grid();
+            root.Margin = new Thickness(18);
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            dialog.Content = root;
+
+            StackPanel header = new StackPanel();
+            header.Children.Add(Text(tweak.Name.ToUpperInvariant(), 16, FontWeights.Bold, _accent));
+            TextBlock description = Text(tweak.Description, 11, FontWeights.Normal, _muted);
+            description.Margin = new Thickness(0, 8, 0, 14);
+            header.Children.Add(description);
+            root.Children.Add(header);
+
+            TextBox patch = new TextBox();
+            patch.Text = RegistryPreview(tweak);
+            patch.FontFamily = _mono;
+            patch.FontSize = 12;
+            patch.Foreground = _text;
+            patch.Background = _panel;
+            patch.BorderBrush = _border;
+            patch.BorderThickness = new Thickness(1);
+            patch.Padding = new Thickness(12);
+            patch.IsReadOnly = true;
+            patch.AcceptsReturn = true;
+            patch.AcceptsTab = true;
+            patch.TextWrapping = TextWrapping.NoWrap;
+            patch.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            patch.HorizontalScrollBarVisibility = ScrollBarVisibility.Auto;
+            Grid.SetRow(patch, 1);
+            root.Children.Add(patch);
+
+            Button close = ActionButton("CLOSE", delegate { dialog.Close(); }, true);
+            close.Width = 110;
+            close.Margin = new Thickness(0, 14, 0, 0);
+            close.HorizontalAlignment = HorizontalAlignment.Right;
+            Grid.SetRow(close, 2);
+            root.Children.Add(close);
+
+            dialog.ShowDialog();
         }
 
         private void ShowNvidiaDriver(object sender, RoutedEventArgs e)
@@ -334,6 +398,34 @@ namespace mpwareLauncher
             AddDebloatTile(grid, 0, 1, "KEEP STORE", "Removes more apps but keeps Microsoft Store.", "debloat -Autorun 1 -debloatS 1");
             AddDebloatTile(grid, 1, 0, "FULL DEBLOAT", "Aggressive preset. Removes the most bundled apps.", "debloat -Autorun 1 -debloatAll 1");
             AddDebloatTile(grid, 1, 1, "ADVANCED PRESETS", "Open the full debloat UI for manual choices.", "debloat");
+
+            RefreshNav();
+        }
+
+        private void ShowRestoreTweaks(object sender, RoutedEventArgs e)
+        {
+            StackPanel page = BeginPage("RESTORE TWEAKS", "Undo and repair helpers live separately from registry patching.", 760);
+
+            Border box = Box(_border);
+            page.Children.Add(box);
+
+            StackPanel stack = new StackPanel { Margin = new Thickness(24) };
+            box.Child = stack;
+            stack.Children.Add(SectionTitle("RESTORE CENTER", "Open the bundled restore tool for registry, app, service, and shell rollback options."));
+            stack.Children.Add(InfoLine("Use this after testing tweaks or before trying a different preset."));
+            stack.Children.Add(InfoLine("Some removals, especially app debloat, may still require reinstalling from Store or winget."));
+
+            Button open = ActionButton("OPEN RESTORE CENTER", delegate { RunScript("Restore.ps1"); }, true);
+            open.Height = 40;
+            open.Margin = new Thickness(0, 24, 0, 0);
+            open.HorizontalAlignment = HorizontalAlignment.Stretch;
+            stack.Children.Add(open);
+
+            Button full = ActionButton("OPEN FULL TOOLS", delegate { RunFunction("import-reg"); }, false);
+            full.Height = 36;
+            full.Margin = new Thickness(0, 12, 0, 0);
+            full.HorizontalAlignment = HorizontalAlignment.Stretch;
+            stack.Children.Add(full);
 
             RefreshNav();
         }
@@ -437,7 +529,7 @@ namespace mpwareLauncher
                 "3. Registry Tweaks: select individual groups, use category Select All, or press SELECT ALL + IMPORT to import every bundled registry tweak.",
                 "4. NVIDIA Driver: press DOWNLOAD AND INSTALL LATEST DRIVER. The PowerShell window stays open if the helper reports an error.",
                 "5. Debloater: start with RECOMMENDED, then restart your PC after registry or app-removal changes."
-            }, "Keys:  Tab move   Space select   Enter activate");
+            }, "");
             two.Children.Add(how);
 
             Border risk = Box(_border);
@@ -463,11 +555,14 @@ namespace mpwareLauncher
                 line.Margin = new Thickness(0, i == 0 ? 20 : 8, 0, 0);
                 stack.Children.Add(line);
             }
-            Border keys = Box(_borderDim);
-            keys.Margin = new Thickness(0, 18, 0, 0);
-            keys.Child = Text(footer, 11, FontWeights.Bold, _accent);
-            keys.Padding = new Thickness(8);
-            stack.Children.Add(keys);
+            if (!String.IsNullOrWhiteSpace(footer))
+            {
+                Border keys = Box(_borderDim);
+                keys.Margin = new Thickness(0, 18, 0, 0);
+                keys.Child = Text(footer, 11, FontWeights.Bold, _accent);
+                keys.Padding = new Thickness(8);
+                stack.Children.Add(keys);
+            }
             return stack;
         }
 
@@ -758,6 +853,13 @@ namespace mpwareLauncher
                 "$ErrorActionPreference='Stop';" +
                 "try {" +
                 "  Set-Location -LiteralPath '" + PsEscape(_runtimeRoot) + "';" +
+                "  $Global:folder='" + PsEscape(_runtimeRoot) + "';" +
+                "  $Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
+                "  $Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
+                "  $Global:iconDir=Join-Path $Global:folder 'mpwareIcons';" +
+                "  $Global:customIcon=Join-Path $Global:iconDir 'Powershell_black.ico';" +
+                "  Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
+                "  Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
                 "  Write-Host 'mpware: starting NVIDIA driver helper...' -ForegroundColor Cyan;" +
                 "  & '" + PsEscape(script) + "';" +
                 "  Write-Host 'mpware: NVIDIA helper finished.' -ForegroundColor Green;" +
@@ -989,16 +1091,24 @@ namespace mpwareLauncher
         private string RegistryPreview(TweakItem tweak)
         {
             StringBuilder sb = new StringBuilder();
+            sb.AppendLine("TWEAK: " + tweak.Name);
+            sb.AppendLine("RISK: " + tweak.Risk);
+            sb.AppendLine("SUMMARY: " + tweak.Description);
+            sb.AppendLine("");
             foreach (RegEntry entry in tweak.Entries)
             {
                 if (entry.DeleteSection)
                 {
-                    sb.AppendLine("DELETE " + entry.Section);
+                    sb.AppendLine("PATH: " + entry.Section);
+                    sb.AppendLine("ACTION: delete this registry key and its subkeys");
                 }
                 else
                 {
-                    sb.AppendLine(entry.Section + " :: " + entry.ValueName + " = " + entry.ValueLine);
+                    sb.AppendLine("PATH: " + entry.Section);
+                    sb.AppendLine("VALUE: " + entry.ValueLine);
                 }
+                sb.AppendLine("DOES: " + DescribeRegistryEntry(entry));
+                sb.AppendLine("");
             }
             return sb.ToString();
         }
@@ -1015,6 +1125,7 @@ namespace mpwareLauncher
             {
                 AddFallbackTweak();
             }
+            RefreshTweakDescriptions();
         }
 
         private void LoadBundledRegistryTweaks()
@@ -1124,7 +1235,7 @@ namespace mpwareLauncher
             item.Category = CategoryForTitle(source, title);
             item.Risk = RiskForTitle(title);
             item.Name = title;
-            item.Description = "Applies " + title.ToLowerInvariant() + " registry changes.";
+            item.Description = "Review the registry patch before applying.";
             item.Entries = new List<RegEntry>();
             _tweaks.Add(item);
             return item;
@@ -1172,6 +1283,135 @@ namespace mpwareLauncher
                 }
             }
             return false;
+        }
+
+        private void RefreshTweakDescriptions()
+        {
+            foreach (TweakItem tweak in _tweaks)
+            {
+                tweak.Description = BuildTweakDescription(tweak);
+            }
+        }
+
+        private string BuildTweakDescription(TweakItem tweak)
+        {
+            string title = tweak.Name.ToLowerInvariant();
+            if (ContainsAny(title, "core isolation", "vbs"))
+                return "Turns off virtualization-based security and memory integrity policy values. Can improve compatibility/performance but lowers hardening.";
+            if (ContainsAny(title, "system requirements", "labconfig", "unsupported"))
+                return "Sets setup compatibility bypass values for unsupported Windows 11 hardware checks.";
+            if (ContainsAny(title, "user account control", "uac"))
+                return "Changes User Account Control policy. This reduces Windows consent prompts and should be treated as advanced.";
+            if (ContainsAny(title, "classic context menu"))
+                return "Restores the older full right-click context menu by adding the Explorer CLSID override.";
+            if (ContainsAny(title, "storage sense"))
+                return "Disables the Storage Sense policy so Windows will not automatically clean selected files.";
+            if (ContainsAny(title, "dark theme"))
+                return "Sets Windows personalization values so apps and the system use dark mode.";
+            if (ContainsAny(title, "transparency"))
+                return "Turns off Windows transparency effects for a simpler shell and slightly less visual overhead.";
+            if (ContainsAny(title, "hardware accelerated gpu", "hags"))
+                return "Enables Hardware-Accelerated GPU Scheduling when the GPU and driver support it.";
+            if (ContainsAny(title, "game bar", "xbox capture", "game dvr"))
+                return "Controls Xbox Game Bar and Game DVR capture/overlay registry values.";
+            if (ContainsAny(title, "game mode"))
+                return "Enables Windows Game Mode policy and GameBar values used by Windows gaming features.";
+            if (ContainsAny(title, "network throttling"))
+                return "Sets the Multimedia SystemProfile network throttling index used by Windows multimedia scheduling.";
+            if (ContainsAny(title, "system responsiveness"))
+                return "Sets the Multimedia SystemProfile CPU reservation value used by background multimedia tasks.";
+            if (ContainsAny(title, "enhance pointer", "mouse"))
+                return "Disables Enhanced Pointer Precision by setting Windows mouse acceleration thresholds to zero.";
+            if (ContainsAny(title, "memory compression"))
+                return "Changes Memory Management values used by Windows memory compression behavior.";
+            if (ContainsAny(title, "remote assistance"))
+                return "Disables Remote Assistance policy values so unsolicited assistance offers are blocked.";
+            if (ContainsAny(title, "long paths"))
+                return "Enables Win32 long path support for applications that opt in to long paths.";
+            if (ContainsAny(title, "last access time"))
+                return "Disables NTFS last-access timestamp updates to reduce file-system metadata writes.";
+            if (ContainsAny(title, "privacy deny"))
+                return "Sets Windows app privacy consent values to deny that permission for Store/UWP apps.";
+            if (ContainsAny(title, "telemetry", "data collection", "diagnostic"))
+                return "Limits Windows diagnostic data and related telemetry policy values where supported by the edition.";
+            if (ContainsAny(title, "copilot", "windows ai", "ai insights"))
+                return "Disables Copilot/Windows AI feature policy or visibility values.";
+            if (ContainsAny(title, "search web results", "web search", "cloud content search", "safe search"))
+                return "Adjusts Windows Search policy values for web results, cloud search, or SafeSearch behavior.";
+            if (ContainsAny(title, "taskbar", "start menu", "recently", "recommend", "widgets", "news and interests", "meet now", "chat", "task view"))
+                return "Changes Explorer, Start, and taskbar registry values for a cleaner Windows shell.";
+            if (ContainsAny(title, "snap"))
+                return "Disables Windows snap layout, snap assist, and snap group shell behavior.";
+            if (ContainsAny(title, "file explorer", "quick access", "hidden files", "file name extensions", "folder type"))
+                return "Changes File Explorer registry values for visibility, navigation, or default folder behavior.";
+            if (ContainsAny(title, "animations", "animate", "peek", "thumbnails", "visual", "best performance", "drop shadows", "smooth edges"))
+                return "Changes Windows visual-effects values used for animations, previews, shadows, thumbnails, and font smoothing.";
+            if (ContainsAny(title, "sleep", "hibernate", "lock", "power modes", "power"))
+                return "Changes power, lock, sleep, or hibernate policy values.";
+            if (ContainsAny(title, "context menu", "run as", "take own", "new menu", "powershell"))
+                return "Adds or changes Explorer context-menu registry entries.";
+
+            if (tweak.Entries.Count == 0)
+            {
+                return "No registry entries were found for this tweak.";
+            }
+
+            string first = DescribeRegistryEntry(tweak.Entries[0]);
+            if (tweak.Entries.Count == 1)
+            {
+                return first;
+            }
+            return first + " Includes " + tweak.Entries.Count + " registry entries.";
+        }
+
+        private string DescribeRegistryEntry(RegEntry entry)
+        {
+            string text = ((entry.Section ?? "") + " " + (entry.ValueName ?? "") + " " + (entry.ValueLine ?? "")).ToLowerInvariant();
+            if (entry.DeleteSection)
+            {
+                return "Deletes this registry key and all values/subkeys under it.";
+            }
+            if (ContainsAny(text, "appsuselighttheme", "systemuseslighttheme"))
+                return "Controls app/system light-vs-dark theme mode; zero selects dark mode.";
+            if (ContainsAny(text, "enabletransparency"))
+                return "Controls Windows transparency effects.";
+            if (ContainsAny(text, "appcaptureenabled", "gamedvr_enabled", "allowgamebar", "allowgamedvr"))
+                return "Controls Xbox Game Bar, Game DVR, and capture availability.";
+            if (ContainsAny(text, "hwschmode"))
+                return "Controls Hardware-Accelerated GPU Scheduling.";
+            if (ContainsAny(text, "mousespeed", "mousethreshold1", "mousethreshold2"))
+                return "Controls Enhanced Pointer Precision/mouse acceleration thresholds.";
+            if (ContainsAny(text, "networkthrottlingindex"))
+                return "Controls Windows multimedia network throttling behavior.";
+            if (ContainsAny(text, "systemresponsiveness"))
+                return "Controls the CPU percentage Windows reserves for background multimedia scheduling.";
+            if (ContainsAny(text, "powerthrottlingoff"))
+                return "Controls the Windows policy that turns Power Throttling off.";
+            if (ContainsAny(text, "win32priorityseparation"))
+                return "Controls foreground/background CPU scheduling separation.";
+            if (ContainsAny(text, "allowtelemetry", "datacollection", "diagnostic"))
+                return "Controls Windows diagnostic data and telemetry policy values.";
+            if (ContainsAny(text, "capabilityaccessmanager", "consentstore", "appprivacy"))
+                return "Controls Windows app permission consent for the named capability.";
+            if (ContainsAny(text, "windowscopilot", "showcopilotbutton", "windowsai", "allowrecallenablement", "disableaidataanalysis"))
+                return "Controls Copilot, Recall, or Windows AI feature availability.";
+            if (ContainsAny(text, "disablewebsearch", "bingsearchenabled", "cloudcontent", "safesearch"))
+                return "Controls Windows Search web, cloud, and filtering behavior.";
+            if (ContainsAny(text, "explorer\\advanced", "taskbar", "start", "searchbox", "hidefileext", "showhidden"))
+                return "Controls Explorer, Start, taskbar, search, or file visibility behavior.";
+            if (ContainsAny(text, "visualfxsetting", "userpreferencesmask", "minanimate", "taskbaranimations", "enableaeropeek"))
+                return "Controls Windows visual effects and animation behavior.";
+            if (ContainsAny(text, "\\services\\") && ContainsAny(text, "\"start\""))
+                return "Controls the startup mode for the referenced Windows service.";
+            if (ContainsAny(text, "longpathsenabled"))
+                return "Controls Win32 long path support.";
+            if (ContainsAny(text, "ntfsdisablelastaccessupdate"))
+                return "Controls NTFS last-access timestamp updates.";
+            if (ContainsAny(text, "disableremoteassistance", "fallowtogethelp"))
+                return "Controls Remote Assistance availability.";
+            if (ContainsAny(text, "hibernat", "showsleepoption", "showlockoption"))
+                return "Controls power menu, sleep, lock, or hibernate behavior.";
+            return "Writes " + entry.ValueName + " under " + entry.Section + ".";
         }
 
         private void AddFallbackTweak()
