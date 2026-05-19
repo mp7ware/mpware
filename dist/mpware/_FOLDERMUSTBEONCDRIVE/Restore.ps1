@@ -62,11 +62,11 @@ if (-not (Get-Command Write-Status -ErrorAction SilentlyContinue)) {
 # Create the form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Restore Changes'
-$form.Size = New-Object System.Drawing.Size(675, 310)
+$form.Size = New-Object System.Drawing.Size(430, 165)
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
 $form.MaximizeBox = $false
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
-$form.BackColor = 'Black'
+$form.BackColor = [System.Drawing.Color]::Black
 $form.Font = New-Object System.Drawing.Font('Segoe UI', 9) 
 if ($Global:customIcon -and (Test-Path -LiteralPath $Global:customIcon)) {
   try {
@@ -79,181 +79,23 @@ $type = $form.GetType()
 $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
 $propInfo.SetValue($form, $true, $null)
 
-$startColor = [System.Drawing.Color]::FromArgb(61, 74, 102)   #rgb(61, 74, 102)
-$endColor = [System.Drawing.Color]::FromArgb(0, 0, 0)       #rgb(0, 0, 0)
+1..15 | ForEach-Object {
+  Set-Variable -Name "checkbox$_" -Value (New-Object System.Windows.Forms.CheckBox) -Scope Script
+}
 
-# Override the form's paint event to apply the gradient
-$form.Add_Paint({
-    param($sender, $e)
-    $rect = New-Object System.Drawing.Rectangle(0, 0, $form.Width, $form.Height)
-    $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-      $rect, 
-      $startColor, 
-      $endColor, 
-      [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal
-    )
-    $e.Graphics.FillRectangle($brush, $rect)
-    $brush.Dispose()
-  })
-
-
-$lineStartPoint = New-Object System.Drawing.Point(170, 15)
-$lineEndPoint = New-Object System.Drawing.Point(170, 165)
-$lineColor = [System.Drawing.Color]::Gray
-$lineWidth = 1.5
-
-$form.Add_Paint({
-    $graphics = $form.CreateGraphics()
-    $pen = New-Object System.Drawing.Pen($lineColor, $lineWidth)
-    $graphics.DrawLine($pen, $lineStartPoint, $lineEndPoint)
-    $pen.Dispose()
-    $graphics.Dispose()
-  })
-
-
-$lineStartPoint2 = New-Object System.Drawing.Point(395, 15)
-$lineEndPoint2 = New-Object System.Drawing.Point(395, 165)
-$lineColor2 = [System.Drawing.Color]::Gray
-$lineWidth2 = 1.5
-
-$form.Add_Paint({
-    $graphics = $form.CreateGraphics()
-    $pen = New-Object System.Drawing.Pen($lineColor2, $lineWidth2)
-    $graphics.DrawLine($pen, $lineStartPoint2, $lineEndPoint2)
-    $pen.Dispose()
-    $graphics.Dispose()
-  })
-
-
-# Create the checkboxes
-$checkbox1 = New-Object System.Windows.Forms.CheckBox
-$checkbox1.Text = 'Enable Updates'
-$checkbox1.Location = New-Object System.Drawing.Point(20, 20)
-$checkbox1.ForeColor = 'White'
-$checkbox1.BackColor = [System.Drawing.Color]::Transparent
-$checkbox1.AutoSize = $true
-$form.Controls.Add($checkbox1)
-
-$checkbox2 = New-Object System.Windows.Forms.CheckBox
-$checkbox2.Text = 'Enable Defender'
-$checkbox2.Location = New-Object System.Drawing.Point(20, 50)
-$checkbox2.ForeColor = 'White'
-$checkbox2.BackColor = [System.Drawing.Color]::Transparent
-$checkbox2.AutoSize = $true
-$form.Controls.Add($checkbox2)
-
-$checkbox3 = New-Object System.Windows.Forms.CheckBox
-$checkbox3.Text = 'Enable Services'
-$checkbox3.ForeColor = 'White'
-$checkbox3.BackColor = [System.Drawing.Color]::Transparent
-$checkbox3.Location = New-Object System.Drawing.Point(20, 80)
-$checkbox3.AutoSize = $true
-$form.Controls.Add($checkbox3)
-
-
-$checkbox4 = New-Object System.Windows.Forms.CheckBox
-$checkbox4.Text = 'Install Microsoft Store'
-$checkbox4.ForeColor = 'White'
-$checkbox4.BackColor = [System.Drawing.Color]::Transparent
-$checkbox4.Location = New-Object System.Drawing.Point(190, 20)
-$checkbox4.AutoSize = $true
-$form.Controls.Add($checkbox4)
-
-$checkbox5 = New-Object System.Windows.Forms.CheckBox
+# Only show restore actions that map to mpware's current registry tweak bundle.
 $checkbox5.Text = 'Revert Registry Tweaks'
 $checkbox5.ForeColor = 'White'
-$checkbox5.BackColor = [System.Drawing.Color]::Transparent
-$checkbox5.Location = New-Object System.Drawing.Point(190, 50)
+$checkbox5.BackColor = [System.Drawing.Color]::Black
+$checkbox5.Location = New-Object System.Drawing.Point(20, 24)
 $checkbox5.AutoSize = $true
 $form.Controls.Add($checkbox5)
 
-$checkbox6 = New-Object System.Windows.Forms.CheckBox
-$checkbox6.Text = 'Repair Xbox Apps'
-$checkbox6.ForeColor = 'White'
-$checkbox6.BackColor = [System.Drawing.Color]::Transparent
-$checkbox6.Location = New-Object System.Drawing.Point(20, 110)
-$checkbox6.AutoSize = $true
-$form.Controls.Add($checkbox6)
-
-
-$checkbox7 = New-Object System.Windows.Forms.CheckBox
-$checkbox7.Text = 'Disable QoS for Upload'
-$checkbox7.ForeColor = 'White'
-$checkbox7.BackColor = [System.Drawing.Color]::Transparent
-$checkbox7.Location = New-Object System.Drawing.Point(190, 80)
-$checkbox7.AutoSize = $true
-$form.Controls.Add($checkbox7)
-
-
-$checkbox8 = New-Object System.Windows.Forms.CheckBox
-$checkbox8.Text = 'Unblock Razer && Asus Downloads'
-$checkbox8.ForeColor = 'White'
-$checkbox8.BackColor = [System.Drawing.Color]::Transparent
-$checkbox8.Location = New-Object System.Drawing.Point(415, 20)
-$checkbox8.AutoSize = $true
-$form.Controls.Add($checkbox8)
-
-$checkbox9 = New-Object System.Windows.Forms.CheckBox
-$checkbox9.Text = 'Unpause Updates'
-$checkbox9.ForeColor = 'White'
-$checkbox9.BackColor = [System.Drawing.Color]::Transparent
-$checkbox9.Location = New-Object System.Drawing.Point(190, 110)
-$checkbox9.AutoSize = $true
-$form.Controls.Add($checkbox9)
-
-$checkbox10 = New-Object System.Windows.Forms.CheckBox
-$checkbox10.Text = 'Restore Default Context Menu'
-$checkbox10.ForeColor = 'White'
-$checkbox10.BackColor = [System.Drawing.Color]::Transparent
-$checkbox10.Location = New-Object System.Drawing.Point(415, 50)
-$checkbox10.AutoSize = $true
-$form.Controls.Add($checkbox10)
-
-$checkbox11 = New-Object System.Windows.Forms.CheckBox
-$checkbox11.Text = 'Remove Dark Winver'
-$checkbox11.ForeColor = 'White'
-$checkbox11.BackColor = [System.Drawing.Color]::Transparent
-$checkbox11.Location = New-Object System.Drawing.Point(415, 80)
-$checkbox11.AutoSize = $true
-$form.Controls.Add($checkbox11)
-
-$checkbox12 = New-Object System.Windows.Forms.CheckBox
-$checkbox12.Text = 'Restore Win 11 Task Manager'
-$checkbox12.ForeColor = 'White'
-$checkbox12.BackColor = [System.Drawing.Color]::Transparent
-$checkbox12.Location = New-Object System.Drawing.Point(415, 110)
-$checkbox12.AutoSize = $true
-$form.Controls.Add($checkbox12)
-
-$checkbox13 = New-Object System.Windows.Forms.CheckBox
-$checkbox13.Text = 'Restore Win 11 Explorer Ribbon'
-$checkbox13.ForeColor = 'White'
-$checkbox13.BackColor = [System.Drawing.Color]::Transparent
-$checkbox13.Location = New-Object System.Drawing.Point(190, 140)
-$checkbox13.AutoSize = $true
-$form.Controls.Add($checkbox13)
-
-$checkbox14 = New-Object System.Windows.Forms.CheckBox
-$checkbox14.Text = 'Enable Backup App'
-$checkbox14.ForeColor = 'White'
-$checkbox14.BackColor = [System.Drawing.Color]::Transparent
-$checkbox14.Location = New-Object System.Drawing.Point(20, 140)
-$checkbox14.AutoSize = $true
-$form.Controls.Add($checkbox14)
-
-$checkbox15 = New-Object System.Windows.Forms.CheckBox
-$checkbox15.Text = 'Enable HVCI/VBS'
-$checkbox15.ForeColor = 'White'
-$checkbox15.BackColor = [System.Drawing.Color]::Transparent
-$checkbox15.Location = New-Object System.Drawing.Point(415, 140)
-$checkbox15.AutoSize = $true
-$form.Controls.Add($checkbox15)
-
-$OKButton = Create-ModernButton -Text 'Apply' -Location (New-Object Drawing.Point(445, 220)) -Size (New-Object Drawing.Size(95, 30)) -DialogResult ([System.Windows.Forms.DialogResult]::OK) -borderSize 2
+$OKButton = Create-ModernButton -Text 'Apply' -Location (New-Object Drawing.Point(210, 82)) -Size (New-Object Drawing.Size(95, 30)) -DialogResult ([System.Windows.Forms.DialogResult]::OK) -borderSize 2
 $form.Controls.Add($OKButton)
 $form.AcceptButton = $OKButton
 
-$CancelButton = Create-ModernButton -Text 'Cancel' -Location (New-Object Drawing.Point(550, 220)) -Size (New-Object Drawing.Size(95, 30)) -DialogResult ([System.Windows.Forms.DialogResult]::Cancel) -borderSize 2
+$CancelButton = Create-ModernButton -Text 'Cancel' -Location (New-Object Drawing.Point(315, 82)) -Size (New-Object Drawing.Size(95, 30)) -DialogResult ([System.Windows.Forms.DialogResult]::Cancel) -borderSize 2
 $form.Controls.Add($CancelButton)
 $form.CancelButton = $CancelButton
     

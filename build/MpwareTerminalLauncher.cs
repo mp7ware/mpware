@@ -407,7 +407,7 @@ namespace mpwareLauncher
             stack.Children.Add(InfoLine("Review the cleanup options in the opened window before running them."));
             stack.Children.Add(InfoLine("A restart may be useful after deep cleanup or update-cache cleanup."));
 
-            Button run = ActionButton("OPEN ULTIMATE CLEANUP", delegate { RunFunctionWithVisibleConsole("UltimateCleanup", true); }, true);
+            Button run = ActionButton("OPEN ULTIMATE CLEANUP", delegate { RunFunctionWithVisibleConsole("UltimateCleanup"); }, true);
             run.Height = 40;
             run.Margin = new Thickness(0, 24, 0, 0);
             run.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -453,7 +453,7 @@ namespace mpwareLauncher
             copy.Margin = new Thickness(0, 10, 0, 18);
             stack.Children.Add(copy);
 
-            Button run = ActionButton("RUN", delegate { RunFunctionWithVisibleConsole(functionCall, true); }, true);
+            Button run = ActionButton("RUN", delegate { RunFunctionWithVisibleConsole(functionCall); }, true);
             run.HorizontalAlignment = HorizontalAlignment.Stretch;
             stack.Children.Add(run);
         }
@@ -600,7 +600,7 @@ namespace mpwareLauncher
 
             AddIncludedColumn(grid, 0, "GAMING", new string[] { "Disable Game DVR", "Enable HAGS", "Disable Mouse Accel", "Disable FSO", "Boost Foreground Priority", "System Profile for Games" });
             AddIncludedColumn(grid, 1, "NETWORK", new string[] { "Disable Net Throttling", "Disable Nagle", "QoS reservation", "MMCSS responsiveness", "Power throttling" });
-            AddIncludedColumn(grid, 2, "CPU & POWER", new string[] { "High Performance Plan", "Timer Resolution", "Core Parking hooks", "Spectre mitigation toggle", "Kernel RAM preference" });
+            AddIncludedColumn(grid, 2, "CPU & POWER", new string[] { "Ultimate Performance Plan", "0.5ms Timer Helper", "Core Parking hooks", "Spectre mitigation toggle", "Kernel RAM preference" });
             return outer;
         }
 
@@ -617,13 +617,23 @@ namespace mpwareLauncher
             }
         }
 
-        private TextBlock RiskLine(string label, Brush brush, string copy)
+        private StackPanel RiskLine(string label, Brush brush, string copy)
         {
-            TextBlock line = Text(label + "   " + copy, 11, FontWeights.Normal, _text);
-            line.Margin = new Thickness(0, 18, 0, 0);
-            line.Foreground = _text;
-            line.TextDecorations = null;
-            return line;
+            StackPanel row = new StackPanel { Orientation = Orientation.Horizontal };
+            row.Margin = new Thickness(0, 18, 0, 0);
+
+            Border pill = new Border();
+            pill.Background = brush;
+            pill.Padding = new Thickness(6, 2, 6, 2);
+            pill.Margin = new Thickness(0, 0, 12, 0);
+            pill.VerticalAlignment = VerticalAlignment.Top;
+            pill.Child = Text(label, 9, FontWeights.Bold, _background);
+            row.Children.Add(pill);
+
+            TextBlock description = Text(copy, 11, FontWeights.Normal, _text);
+            description.MaxWidth = 250;
+            row.Children.Add(description);
+            return row;
         }
 
         private TextBlock InfoLine(string text)
@@ -722,22 +732,33 @@ namespace mpwareLauncher
         {
             string regPath = IOPath.Combine(IOPath.GetTempPath(), "mpware-selected-" + Guid.NewGuid().ToString("N") + ".reg");
             File.WriteAllText(regPath, BuildRegFile(selected), Encoding.Unicode);
+            bool applyBlackWallpaper = HasSelectedAction(selected, "black-wallpaper");
+            bool applyPowerPlan = HasSelectedAction(selected, "ultimate-power-plan");
+            bool applyTimerResolution = HasSelectedAction(selected, "timer-resolution");
             string script =
                 "$ErrorActionPreference='Stop';" +
                 "$reg='" + PsEscape(regPath) + "';" +
                 "$host.UI.RawUI.WindowTitle='mpware progress log';" +
                 "Clear-Host;" +
+                "try {" +
                 "Write-Host 'mpware: progress log' -ForegroundColor Cyan;" +
                 "Write-Host 'mpware: preparing to apply " + PsEscape(label) + "...' -ForegroundColor Cyan;" +
                 RestorePointScript("registry tweaks") +
                 "Write-Host 'mpware: importing selected registry tweaks with reg.exe...' -ForegroundColor Cyan;" +
                 "& reg.exe import $reg;" +
                 "if ($LASTEXITCODE -ne 0) { throw 'reg.exe import failed with exit code ' + $LASTEXITCODE };" +
+                (applyBlackWallpaper ? BlackWallpaperScript() : "") +
+                (applyPowerPlan ? UltimatePowerPlanScript() : "") +
+                (applyTimerResolution ? TimerResolutionScript() : "") +
                 "Write-Host 'mpware: restarting Explorer to refresh visible Windows settings...' -ForegroundColor Cyan;" +
                 "try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch { Write-Host ('mpware: explorer restart skipped: ' + $_.Exception.Message) -ForegroundColor Yellow };" +
                 "Write-Host 'mpware: registry tweaks applied. Restart recommended.' -ForegroundColor Green;" +
-                "Write-Host ''; Read-Host 'Press Enter to close'";
-            RunElevatedPowerShellNoExit(script, "applying " + label);
+                "} catch {" +
+                "  Write-Host ''; Write-Host 'mpware: registry apply failed:' -ForegroundColor Red;" +
+                "  Write-Host $_.Exception.Message -ForegroundColor Red;" +
+                "  Write-Host ''; Read-Host 'Press Enter to close';" +
+                "}";
+            RunElevatedPowerShell(script, "applying " + label);
         }
 
         private void ExportSelectedReg(object sender, RoutedEventArgs e)
@@ -818,17 +839,20 @@ namespace mpwareLauncher
                 "  Write-Host ''; Read-Host 'Press Enter to close';" +
                 "}";
 
-            RunElevatedPowerShellNoExit(command, "launching NVIDIA driver helper");
+            RunElevatedPowerShell(command, "launching NVIDIA driver helper");
         }
 
-        private void RunElevatedPowerShellNoExit(string script, string log)
+        private void RunElevatedPowerShell(string script, string log)
         {
             SetStatus(log);
             string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = "powershell.exe";
-            psi.Arguments = "-NoExit -NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded;
-            psi.WorkingDirectory = _runtimeRoot;
+            psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded;
+            if (!String.IsNullOrWhiteSpace(_runtimeRoot))
+            {
+                psi.WorkingDirectory = _runtimeRoot;
+            }
             psi.UseShellExecute = true;
             psi.Verb = "runas";
             Process.Start(psi);
@@ -861,10 +885,10 @@ namespace mpwareLauncher
                 "Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
                 "Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
                 "& '" + PsEscape(script) + "';";
-            RunElevatedPowerShellNoExit(command, "launching " + relativeScript);
+            RunElevatedPowerShell(command, "launching " + relativeScript);
         }
 
-        private void RunFunctionWithVisibleConsole(string functionCall, bool createRestorePoint)
+        private void RunFunctionWithVisibleConsole(string functionCall)
         {
             if (!EnsureRuntime())
             {
@@ -887,16 +911,15 @@ namespace mpwareLauncher
                 "  $Global:customIcon=Join-Path $Global:iconDir 'mp7.ico';" +
                 "  Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
                 "  Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
-                (createRestorePoint ? RestorePointScript(functionCall) : "") +
                 "  Write-Host 'mpware: starting " + PsEscape(functionCall) + "...' -ForegroundColor Cyan;" +
                 "  " + functionCall + ";" +
                 "  Write-Host 'mpware: command finished.' -ForegroundColor Green;" +
                 "} catch {" +
                 "  Write-Host ''; Write-Host 'mpware: command failed:' -ForegroundColor Red;" +
                 "  Write-Host $_.Exception.Message -ForegroundColor Red;" +
-                "};" +
-                "Write-Host ''; Read-Host 'Press Enter to close'";
-            RunElevatedPowerShellNoExit(command, "launching " + functionCall);
+                "  Write-Host ''; Read-Host 'Press Enter to close';" +
+                "}";
+            RunElevatedPowerShell(command, "launching " + functionCall);
         }
 
         private bool EnsureRuntime()
@@ -1032,9 +1055,61 @@ namespace mpwareLauncher
                 "  };";
         }
 
+        private string BlackWallpaperScript()
+        {
+            return
+                "Write-Host 'mpware: applying solid black desktop background...' -ForegroundColor Cyan;" +
+                "Set-ItemProperty -Path 'HKCU:\\Control Panel\\Colors' -Name 'Background' -Value '0 0 0' -Force;" +
+                "Set-ItemProperty -Path 'HKCU:\\Control Panel\\Desktop' -Name 'Wallpaper' -Value '' -Force;" +
+                "if (-not ('MpwareWallpaperRefresh' -as [type])) {" +
+                "Add-Type -TypeDefinition @'\n" +
+                "using System;\n" +
+                "using System.Runtime.InteropServices;\n" +
+                "public class MpwareWallpaperRefresh {\n" +
+                "  [DllImport(\"user32.dll\", CharSet=CharSet.Auto)] public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);\n" +
+                "  [DllImport(\"user32.dll\", SetLastError=true)] public static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);\n" +
+                "}\n" +
+                "'@;" +
+                "};" +
+                "[MpwareWallpaperRefresh]::SystemParametersInfo(0x0014, 0, '', 0x01 -bor 0x02) | Out-Null;" +
+                "[MpwareWallpaperRefresh]::InvalidateRect([IntPtr]::Zero, [IntPtr]::Zero, $true) | Out-Null;" +
+                "1..5 | ForEach-Object { & rundll32.exe user32.dll,UpdatePerUserSystemParameters 1, True; Start-Sleep -Milliseconds 25 };";
+        }
+
+        private string UltimatePowerPlanScript()
+        {
+            return
+                "Write-Host 'mpware: enabling Ultimate Performance power plan...' -ForegroundColor Cyan;" +
+                "$ultimate='e9a42b02-d5df-448d-aa00-03f14749eb61';" +
+                "$guid=$null;" +
+                "$list=powercfg /list 2>$null;" +
+                "foreach ($line in $list) { if ($line -match '([0-9a-fA-F-]{36}).*Ultimate Performance') { $guid=$matches[1]; break } };" +
+                "if (-not $guid) { $out=powercfg -duplicatescheme $ultimate 2>$null; if ($out -match '([0-9a-fA-F-]{36})') { $guid=$matches[1] } };" +
+                "if (-not $guid) { $guid=$ultimate };" +
+                "powercfg /setactive $guid;" +
+                "if ($LASTEXITCODE -ne 0) { throw 'powercfg failed to activate Ultimate Performance' };" +
+                "powercfg -h off | Out-Null;";
+        }
+
+        private string TimerResolutionScript()
+        {
+            return
+                "Write-Host 'mpware: enabling global timer resolution requests...' -ForegroundColor Cyan;" +
+                "New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Force | Out-Null;" +
+                "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Name 'GlobalTimerResolutionRequests' -Type DWord -Value 1 -Force;" +
+                "$timer=Join-Path $Global:folder 'mpware-timer-resolution.exe';" +
+                "if (Test-Path -LiteralPath $timer) {" +
+                "  & $timer --install --resolution 5000;" +
+                "  if ($LASTEXITCODE -ne 0) { throw 'mpware timer resolution helper failed with exit code ' + $LASTEXITCODE };" +
+                "} else {" +
+                "  Write-Host 'mpware: timer resolution helper missing; registry key was applied only.' -ForegroundColor Yellow;" +
+                "};";
+        }
+
         private void BuildTweaks()
         {
             LoadBundledRegistryTweaks();
+            AddManagedTweaks();
             if (_tweaks.Count == 0)
             {
                 AddFallbackTweak();
@@ -1151,8 +1226,41 @@ namespace mpwareLauncher
             item.Name = title;
             item.Description = "Review the registry patch before applying.";
             item.Entries = new List<RegEntry>();
+            item.ActionId = ActionForTitle(title);
             _tweaks.Add(item);
             return item;
+        }
+
+        private void AddManagedTweaks()
+        {
+            TweakItem power = NewParsedTweak("MANAGED", "Enable Ultimate Performance power plan");
+            power.Category = "CPU & POWER";
+            power.Risk = "Moderate";
+            power.ActionId = "ultimate-power-plan";
+            power.Description = "Activates Windows Ultimate Performance via powercfg and disables hibernation.";
+
+            TweakItem timer = NewParsedTweak("MANAGED", "Enable 0.5ms timer resolution helper");
+            timer.Category = "CPU & POWER";
+            timer.Risk = "Moderate";
+            timer.ActionId = "timer-resolution";
+            timer.Description = "Enables GlobalTimerResolutionRequests and installs a lightweight startup helper that requests 0.5ms timer resolution.";
+            AddRegEntry(timer, new RegEntry {
+                Section = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel",
+                ValueName = "\"GlobalTimerResolutionRequests\"",
+                ValueLine = "\"GlobalTimerResolutionRequests\"=dword:00000001"
+            });
+        }
+
+        private bool HasSelectedAction(List<TweakItem> selected, string actionId)
+        {
+            foreach (TweakItem tweak in selected)
+            {
+                if (String.Equals(tweak.ActionId, actionId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void AddRegEntry(TweakItem tweak, RegEntry entry)
@@ -1190,6 +1298,16 @@ namespace mpwareLauncher
             return "Safe";
         }
 
+        private string ActionForTitle(string title)
+        {
+            string text = title.ToLowerInvariant();
+            if (ContainsAny(text, "set background black", "remove picture wallpaper", "set wallpaper to solid color"))
+            {
+                return "black-wallpaper";
+            }
+            return null;
+        }
+
         private bool ContainsAny(string text, params string[] needles)
         {
             foreach (string needle in needles)
@@ -1213,6 +1331,12 @@ namespace mpwareLauncher
         private string BuildTweakDescription(TweakItem tweak)
         {
             string title = tweak.Name.ToLowerInvariant();
+            if (String.Equals(tweak.ActionId, "ultimate-power-plan", StringComparison.OrdinalIgnoreCase))
+                return "Activates the built-in Windows Ultimate Performance power scheme and disables hibernation.";
+            if (String.Equals(tweak.ActionId, "timer-resolution", StringComparison.OrdinalIgnoreCase))
+                return "Enables GlobalTimerResolutionRequests and installs the mpware timer helper to request 0.5ms resolution at logon.";
+            if (String.Equals(tweak.ActionId, "black-wallpaper", StringComparison.OrdinalIgnoreCase))
+                return "Sets the desktop wallpaper to a blank solid black background and refreshes Explorer visuals immediately.";
             if (ContainsAny(title, "core isolation", "vbs"))
                 return "Turns off virtualization-based security and memory integrity policy values. Can improve compatibility/performance but lowers hardening.";
             if (ContainsAny(title, "system requirements", "labconfig", "unsupported"))
@@ -1359,6 +1483,7 @@ namespace mpwareLauncher
             public string Risk;
             public string Name;
             public string Description;
+            public string ActionId;
             public List<RegEntry> Entries;
             public CheckBox Selector;
         }
