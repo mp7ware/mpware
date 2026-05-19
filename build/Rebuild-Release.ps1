@@ -19,7 +19,7 @@ $terminalSource = Join-Path $PSScriptRoot 'MpwareTerminalLauncher.cs'
 $timerSource = Join-Path $PSScriptRoot 'MpwareTimerResolution.cs'
 $launcherManifest = Join-Path $PSScriptRoot 'MpwareLauncher.manifest'
 $launcherIcon = Join-Path $runtimeRoot 'mpwareIcons\mp7.ico'
-$timerExe = Join-Path $runtimeRoot 'mpware-timer-resolution.exe'
+$timerExe = Join-Path $runtimeRoot 'SetTimerResolution.exe'
 
 if (-not (Test-Path -LiteralPath (Join-Path $runtimeRoot 'mpware.ps1'))) {
     throw "Missing runtime script: $runtimeRoot"
@@ -60,6 +60,11 @@ foreach ($ref in $wpfRefs) {
 
 $runtimeZip = Join-Path ([System.IO.Path]::GetTempPath()) "mpware-runtime-$([guid]::NewGuid().ToString('N')).zip"
 try {
+    $staleTimerExe = Join-Path $runtimeRoot 'mpware-timer-resolution.exe'
+    if (Test-Path -LiteralPath $staleTimerExe) {
+        Remove-Item -LiteralPath $staleTimerExe -Force
+    }
+
     $timerArgs = @(
         '/nologo',
         '/target:winexe',

@@ -196,7 +196,7 @@ namespace mpwareLauncher
             buttons.Children.Add(ActionButton("EXPORT .REG", ExportSelectedReg, false));
 
             string currentCategory = null;
-            foreach (TweakItem tweak in _tweaks)
+            foreach (TweakItem tweak in OrderedTweaks())
             {
                 if (!String.Equals(currentCategory, tweak.Category, StringComparison.Ordinal))
                 {
@@ -520,7 +520,7 @@ namespace mpwareLauncher
             warningStack.Children.Add(Bullet("mpware.exe prompts for Administrator on launch."));
             warningStack.Children.Add(Bullet("PowerShell closes automatically after successful actions and stays open only if an error needs review."));
             warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability, compatibility issues, or security tradeoffs."));
-            warningStack.Children.Add(Bullet("Ultimate Performance and 0.5ms timer resolution are managed tweaks; they change power/timer behavior beyond simple registry import."));
+            warningStack.Children.Add(Bullet("Ultimate Performance and the 0.5ms timer-resolution boot task are managed tweaks; they change power/timer behavior beyond simple registry import."));
             warningStack.Children.Add(Bullet("Not responsible for any damage or data loss from using these scripts."));
             warningStack.Children.Add(Bullet("Debloat removal is permanent - removed apps must be reinstalled from the Store or winget."));
             page.Children.Add(warnings);
@@ -737,9 +737,12 @@ namespace mpwareLauncher
             bool applyBlackWallpaper = HasSelectedAction(selected, "black-wallpaper");
             bool applyPowerPlan = HasSelectedAction(selected, "ultimate-power-plan");
             bool applyTimerResolution = HasSelectedAction(selected, "timer-resolution");
+            string escapedRoot = PsEscape(_runtimeRoot ?? "");
             string script =
                 "$ErrorActionPreference='Stop';" +
                 "$reg='" + PsEscape(regPath) + "';" +
+                "$Global:folder='" + escapedRoot + "';" +
+                "if (-not [string]::IsNullOrWhiteSpace($Global:folder)) { Set-Location -LiteralPath $Global:folder };" +
                 "$host.UI.RawUI.WindowTitle='mpware progress log';" +
                 "Clear-Host;" +
                 "try {" +
@@ -749,9 +752,9 @@ namespace mpwareLauncher
                 "Write-Host 'mpware: importing selected registry tweaks with reg.exe...' -ForegroundColor Cyan;" +
                 "& reg.exe import $reg;" +
                 "if ($LASTEXITCODE -ne 0) { throw 'reg.exe import failed with exit code ' + $LASTEXITCODE };" +
-                (applyBlackWallpaper ? BlackWallpaperScript() : "") +
-                (applyPowerPlan ? UltimatePowerPlanScript() : "") +
-                (applyTimerResolution ? TimerResolutionScript() : "") +
+                (applyBlackWallpaper ? ProtectedFollowUpScript("solid black desktop background", BlackWallpaperScript()) : "") +
+                (applyPowerPlan ? ProtectedFollowUpScript("Ultimate Performance power plan", UltimatePowerPlanScript()) : "") +
+                (applyTimerResolution ? ProtectedFollowUpScript("timer resolution boot helper", TimerResolutionScript()) : "") +
                 "Write-Host 'mpware: restarting Explorer to refresh visible Windows settings...' -ForegroundColor Cyan;" +
                 "try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch { Write-Host ('mpware: explorer restart skipped: ' + $_.Exception.Message) -ForegroundColor Yellow };" +
                 "Write-Host 'mpware: registry tweaks applied. Restart recommended.' -ForegroundColor Green;" +
@@ -1099,12 +1102,24 @@ namespace mpwareLauncher
                 "Write-Host 'mpware: enabling global timer resolution requests...' -ForegroundColor Cyan;" +
                 "New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Force | Out-Null;" +
                 "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Name 'GlobalTimerResolutionRequests' -Type DWord -Value 1 -Force;" +
-                "$timer=Join-Path $Global:folder 'mpware-timer-resolution.exe';" +
+                "Write-Host 'mpware: installing SetTimerResolution boot task...' -ForegroundColor Cyan;" +
+                "if ([string]::IsNullOrWhiteSpace($Global:folder)) { throw 'runtime folder was not found' };" +
+                "$timer=Join-Path $Global:folder 'SetTimerResolution.exe';" +
                 "if (Test-Path -LiteralPath $timer) {" +
                 "  & $timer --install --resolution 5000;" +
                 "  if ($LASTEXITCODE -ne 0) { throw 'mpware timer resolution helper failed with exit code ' + $LASTEXITCODE };" +
                 "} else {" +
                 "  Write-Host 'mpware: timer resolution helper missing; registry key was applied only.' -ForegroundColor Yellow;" +
+                "};";
+        }
+
+        private string ProtectedFollowUpScript(string label, string script)
+        {
+            return
+                "try {" +
+                script +
+                "} catch {" +
+                "  Write-Host ('mpware: " + PsEscape(label) + " skipped: ' + $_.Exception.Message) -ForegroundColor Yellow;" +
                 "};";
         }
 
@@ -1245,7 +1260,7 @@ namespace mpwareLauncher
             timer.Category = "CPU & POWER";
             timer.Risk = "Moderate";
             timer.ActionId = "timer-resolution";
-            timer.Description = "Enables GlobalTimerResolutionRequests and installs a lightweight startup helper that requests 0.5ms timer resolution.";
+            timer.Description = "Enables GlobalTimerResolutionRequests and installs a hidden boot task that requests 0.5ms timer resolution.";
             AddRegEntry(timer, new RegEntry {
                 Section = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel",
                 ValueName = "\"GlobalTimerResolutionRequests\"",
@@ -1292,6 +1307,38 @@ namespace mpwareLauncher
             return "WINDOWS TWEAKS";
         }
 
+        private List<TweakItem> OrderedTweaks()
+        {
+            List<TweakItem> ordered = new List<TweakItem>(_tweaks);
+            ordered.Sort(delegate(TweakItem left, TweakItem right)
+            {
+                int category = CategoryRank(left.Category).CompareTo(CategoryRank(right.Category));
+                if (category != 0)
+                {
+                    return category;
+                }
+                int name = StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
+                if (name != 0)
+                {
+                    return name;
+                }
+                return 0;
+            });
+            return ordered;
+        }
+
+        private int CategoryRank(string category)
+        {
+            if (String.Equals(category, "GAMING PERFORMANCE", StringComparison.Ordinal)) return 0;
+            if (String.Equals(category, "NETWORK & LATENCY", StringComparison.Ordinal)) return 1;
+            if (String.Equals(category, "CPU & POWER", StringComparison.Ordinal)) return 2;
+            if (String.Equals(category, "PRIVACY & TELEMETRY", StringComparison.Ordinal)) return 3;
+            if (String.Equals(category, "VISUAL & SHELL", StringComparison.Ordinal)) return 4;
+            if (String.Equals(category, "WINDOWS TWEAKS", StringComparison.Ordinal)) return 5;
+            if (String.Equals(category, "CONTEXT MENU", StringComparison.Ordinal)) return 6;
+            return 99;
+        }
+
         private string RiskForTitle(string title)
         {
             string text = title.ToLowerInvariant();
@@ -1336,7 +1383,7 @@ namespace mpwareLauncher
             if (String.Equals(tweak.ActionId, "ultimate-power-plan", StringComparison.OrdinalIgnoreCase))
                 return "Activates the built-in Windows Ultimate Performance power scheme and disables hibernation.";
             if (String.Equals(tweak.ActionId, "timer-resolution", StringComparison.OrdinalIgnoreCase))
-                return "Enables GlobalTimerResolutionRequests and installs the mpware timer helper to request 0.5ms resolution at logon.";
+                return "Enables GlobalTimerResolutionRequests and installs SetTimerResolution.exe as a hidden boot task that requests 0.5ms timer resolution.";
             if (String.Equals(tweak.ActionId, "black-wallpaper", StringComparison.OrdinalIgnoreCase))
                 return "Sets the desktop wallpaper to a blank solid black background and refreshes Explorer visuals immediately.";
             if (ContainsAny(title, "core isolation", "vbs"))

@@ -66,6 +66,11 @@ namespace mpwareLauncher
                 return 4;
             }
 
+            if (!File.Exists(IOPath.Combine(root, "SetTimerResolution.exe")))
+            {
+                return 5;
+            }
+
             return 0;
         }
 
