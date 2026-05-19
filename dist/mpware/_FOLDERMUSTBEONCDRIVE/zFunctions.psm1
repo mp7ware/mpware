@@ -3282,7 +3282,6 @@ function gpTweaks {
 
   param (
     [Parameter(mandatory = $false)] [bool]$Autorun = $false
-    , [Parameter(mandatory = $false)] [bool]$gpDefender = $false
     , [Parameter(mandatory = $false)] [bool]$gpUpdates = $false
     , [Parameter(mandatory = $false)] [bool]$gpTel = $false
   )
@@ -3299,8 +3298,6 @@ function gpTweaks {
   #hashtable to loop through
   $settings = @{}
   $settings['gpUpdates'] = $checkbox1
-  # mpware: Defender-disable setting is blocked.
-  $settings['gpDefender'] = $checkbox2
   $settings['gpTel'] = $checkbox3
 
 
@@ -3317,7 +3314,7 @@ function gpTweaks {
     # Create the form
     $form = New-Object System.Windows.Forms.Form
     $form.Text = 'Group Policy Tweaks'
-    $form.Size = New-Object System.Drawing.Size(300, 200)
+    $form.Size = New-Object System.Drawing.Size(300, 170)
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $form.MaximizeBox = $false
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
@@ -3413,19 +3410,8 @@ function gpTweaks {
     $checkbox1.AutoSize = $true
     $form.Controls.Add($checkbox1)
     
-    
-    $checkbox2.Text = 'Disable Defender (blocked)'
-    $checkbox2.Location = New-Object System.Drawing.Point(20, 50)
-    $checkbox2.ForeColor = 'White'
-    $checkbox2.BackColor = [System.Drawing.Color]::Transparent
-    $checkbox2.AutoSize = $true
-    $checkbox2.Enabled = $false
-    $checkbox2.Checked = $false
-    $form.Controls.Add($checkbox2)
-    
-    
     $checkbox3.Text = 'Disable Telemetry'
-    $checkbox3.Location = New-Object System.Drawing.Point(20, 80)
+    $checkbox3.Location = New-Object System.Drawing.Point(20, 50)
     $checkbox3.ForeColor = 'White'
     $checkbox3.BackColor = [System.Drawing.Color]::Transparent
     $checkbox3.AutoSize = $true
@@ -3440,9 +3426,9 @@ function gpTweaks {
 
     
     
-    $OKButton = Create-ModernButton -Text 'OK' -Location (New-Object Drawing.Point(70, 135)) -Size (New-Object Drawing.Size(75, 25)) -DialogResult ([System.Windows.Forms.DialogResult]::OK) -borderSize 2
+    $OKButton = Create-ModernButton -Text 'OK' -Location (New-Object Drawing.Point(70, 100)) -Size (New-Object Drawing.Size(75, 25)) -DialogResult ([System.Windows.Forms.DialogResult]::OK) -borderSize 2
     $form.Controls.Add($OKButton)
-    $CancelButton = Create-ModernButton -Text 'Cancel' -Location (New-Object Drawing.Point(150, 135)) -Size (New-Object Drawing.Size(75, 25)) -DialogResult ([System.Windows.Forms.DialogResult]::Cancel) -borderSize 2
+    $CancelButton = Create-ModernButton -Text 'Cancel' -Location (New-Object Drawing.Point(150, 100)) -Size (New-Object Drawing.Size(75, 25)) -DialogResult ([System.Windows.Forms.DialogResult]::Cancel) -borderSize 2
     $form.Controls.Add($CancelButton)
 
     
@@ -3493,11 +3479,6 @@ function gpTweaks {
     }
   
   
-    if ($checkbox2.Checked) {
-      Write-Status -Message 'mpware blocks the Disable Defender tweak. Microsoft Defender changes were not applied.' -Type Warning
-      $checkbox2.Checked = $false
-    }
-
     if ($checkbox3.Checked) {
       Write-Status -Message 'Disabling Telemetry...' -Type Output
       #removes telemetry through gp edit
@@ -4043,7 +4024,7 @@ function import-powerplan {
     $powerPlanPanel.Controls.Add($checkboxCustomPlan2)
 
     $tooltip2 = New-Object System.Windows.Forms.ToolTip
-    $tooltip2.SetToolTip($checkboxCustomPlan2, 'Helps to Stabilize PBO When Idling for AMD CPUs')
+    $tooltip2.SetToolTip($checkboxCustomPlan2, 'AMD-focused Ultimate Performance power profile')
    
     $labelCustom2 = New-Object System.Windows.Forms.Label
     $labelCustom2.Text = 'Import Your Own Plan:'
@@ -5675,7 +5656,6 @@ function OptionalTweaks {
     , [Parameter(mandatory = $false)] [bool]$opremoveRecycle = $false
     , [Parameter(mandatory = $false)] [bool]$opblockRazerAsus = $false
     , [Parameter(mandatory = $false)] [bool]$opremoveNetworkIcon = $false 
-    , [Parameter(mandatory = $false)] [bool]$opapplyPBO = $false
     , [Parameter(mandatory = $false)] [bool]$opnoDriversInUpdate = $false
     , [Parameter(mandatory = $false)] [bool]$connewFiles = $false
     , [Parameter(mandatory = $false)] [bool]$conmorePS = $false
@@ -5713,7 +5693,6 @@ function OptionalTweaks {
     , [Parameter(mandatory = $false)] [bool]$opNoMouseAccel = $false
     , [Parameter(mandatory = $false)] [bool]$opDisableDeviceEncryption = $false
     , [Parameter(mandatory = $false)] [bool]$opClassicAccents = $false
-    , [Parameter(mandatory = $false)] [bool]$conScanDefender = $false
     , [Parameter(mandatory = $false)] [bool]$conPersonalizeClassic = $false
     , [Parameter(mandatory = $false)] [bool]$dialogAppUninstall = $false
     , [Parameter(mandatory = $false)] [bool]$dialogMergeConflicts = $false
@@ -5801,7 +5780,6 @@ function OptionalTweaks {
   $settings['conkillTasks'] = $checkbox20
   $settings['conpermDel'] = $checkbox26
   $settings['opremoveNetworkIcon'] = $checkbox23
-  $settings['opapplyPBO'] = $checkbox24
   $settings['opnoDriversInUpdate'] = $checkbox29
   $settings['opremoveMouseSoundSchemes'] = $checkbox31
   $settings['opremoveRecycle'] = $checkbox33
@@ -5833,7 +5811,6 @@ function OptionalTweaks {
   $settings['opNoMouseAccel'] = $checkbox61
   $settings['opDisableDeviceEncryption'] = $checkbox62
   $settings['opClassicAccents'] = $checkbox63
-  $settings['conScanDefender'] = $checkbox64
   $settings['conPersonalizeClassic'] = $checkbox65
   $settings['dialogAppUninstall'] = $checkbox66
   $settings['dialogMergeConflicts'] = $checkbox67
@@ -5861,7 +5838,6 @@ function OptionalTweaks {
     $checkbox20.Checked = $conkillTasks
     $checkbox26.Checked = $conpermDel
     $checkbox23.Checked = $opremoveNetworkIcon
-    $checkbox24.Checked = $opapplyPBO
     $checkbox29.Checked = $opnoDriversInUpdate
     $checkbox31.Checked = $opremoveMouseSoundSchemes
     $checkbox33.Checked = $opremoveRecycle
@@ -5893,7 +5869,6 @@ function OptionalTweaks {
     $checkbox61.Checked = $opNoMouseAccel
     $checkbox62.Checked = $opDisableDeviceEncryption
     $checkbox63.Checked = $opClassicAccents
-    $checkbox64.Checked = $conScanDefender
     $checkbox65.Checked = $conPersonalizeClassic
     $checkbox66.Checked = $dialogAppUninstall
     $checkbox67.Checked = $dialogMergeConflicts
@@ -6310,13 +6285,6 @@ function OptionalTweaks {
     $checkbox13.Checked = $false
     $miscGroupBox.Controls.Add($checkbox13)
     
-    $checkbox24.Location = New-Object System.Drawing.Size(10, 70)
-    $checkbox24.Size = New-Object System.Drawing.Size(240, 30)
-    $checkbox24.Text = 'Apply PBO Curve on Startup'
-    $checkbox24.ForeColor = 'White'
-    $checkbox24.Checked = $false
-    $miscGroupBox.Controls.Add($checkbox24)
-    
     $checkbox51.Location = New-Object System.Drawing.Size(10, 95)
     $checkbox51.Size = New-Object System.Drawing.Size(240, 30)
     $checkbox51.Text = 'Disable PowerShell Logging'
@@ -6557,14 +6525,6 @@ function OptionalTweaks {
     $checkbox49.Checked = $false
     $form.Controls.Add($checkbox49)
     $contextMenuPanel.Controls.Add($checkbox49)
-
-    $checkbox64.Location = New-Object System.Drawing.Size(270, 430)
-    $checkbox64.Size = New-Object System.Drawing.Size(250, 30)
-    $checkbox64.Text = 'Scan with Defender'
-    $checkbox64.ForeColor = 'White'
-    $checkbox64.Checked = $false
-    $form.Controls.Add($checkbox64)
-    $contextMenuPanel.Controls.Add($checkbox64)
 
     $checkbox65.Location = New-Object System.Drawing.Size(20, 310)
     $checkbox65.Size = New-Object System.Drawing.Size(250, 30)
@@ -6926,242 +6886,6 @@ function OptionalTweaks {
       
     }
       
-    if ($checkbox24.Checked) {
-
-      if (!(Check-Internet)) {
-        #limits (in order)
-        $ppt = '0'
-        $tdc = '0'
-        $edc = '0'
-
-
-        Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.Application]::EnableVisualStyles()
-
-        # Retrieve the number of CPU cores
-        $cpuCores = (Get-CimInstance -ClassName Win32_Processor).NumberOfCores
-
-        $size = 300 + ($cpuCores * 20)
-
-        # Create the form
-        $form = New-Object System.Windows.Forms.Form
-        $form.Text = 'PBO2 Tuner'
-        $form.Size = New-Object System.Drawing.Size(400, $size)
-        $form.StartPosition = 'CenterScreen'
-        $form.BackColor = 'Black'
-        $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-        $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
-
-        # Create a checkbox
-        $checkBox = New-Object System.Windows.Forms.CheckBox
-        $checkBox.Text = 'Custom Limits'
-        $checkBox.ForeColor = 'White'
-        $checkbox.Size = New-Object System.Drawing.Size(150, 15)
-        $checkBox.Location = New-Object System.Drawing.Point(200, 140)
-
-        # Create three textboxes
-        $limitBox1 = New-Object System.Windows.Forms.TextBox
-        $limitBox1.Location = New-Object System.Drawing.Point(220, 170)
-        $limitBox1.Size = New-Object System.Drawing.Size(60, 20)
-        $limitBox1.Visible = $false
-        $limitBox1.MaxLength = 3
-
-        $limitBox2 = New-Object System.Windows.Forms.TextBox
-        $limitBox2.Location = New-Object System.Drawing.Point(220, 200)
-        $limitBox2.Size = New-Object System.Drawing.Size(60, 20)
-        $limitBox2.Visible = $false
-        $limitBox2.MaxLength = 3
-
-        $limitBox3 = New-Object System.Windows.Forms.TextBox
-        $limitBox3.Location = New-Object System.Drawing.Point(220, 230)
-        $limitBox3.Size = New-Object System.Drawing.Size(60, 20)
-        $limitBox3.Visible = $false
-        $limitBox3.MaxLength = 3
-
-        # Create three labels
-        $label1 = New-Object System.Windows.Forms.Label
-        $label1.Text = 'PPT'
-        $label1.Location = New-Object System.Drawing.Point(190, 170)
-        $label1.ForeColor = 'White'
-        $label1.Visible = $false
-
-        $label2 = New-Object System.Windows.Forms.Label
-        $label2.Text = 'TDC'
-        $label2.Location = New-Object System.Drawing.Point(190, 200)
-        $label2.ForeColor = 'White'
-        $label2.Visible = $false
-
-        $label3 = New-Object System.Windows.Forms.Label
-        $label3.Text = 'EDC'
-        $label3.Location = New-Object System.Drawing.Point(190, 230)
-        $label3.ForeColor = 'White'
-        $label3.Visible = $false
-
-        # Add event handler for checkbox checked event
-        $checkBox.add_CheckedChanged({
-            if ($checkBox.Checked) {
-              $limitBox1.Visible = $true
-              $limitBox2.Visible = $true
-              $limitBox3.Visible = $true
-              $label1.Visible = $true
-              $label2.Visible = $true
-              $label3.Visible = $true
-            }
-            else {
-              $limitBox1.Visible = $false
-              $limitBox2.Visible = $false
-              $limitBox3.Visible = $false
-              $label1.Visible = $false
-              $label2.Visible = $false
-              $label3.Visible = $false
-            }
-          })
-
-        # Add controls to the form
-        $form.Controls.Add($checkBox)
-        $form.Controls.Add($limitBox1)
-        $form.Controls.Add($limitBox2)
-        $form.Controls.Add($limitBox3)
-        $form.Controls.Add($label1)
-        $form.Controls.Add($label2)
-        $form.Controls.Add($label3)
-
-        # Create the label
-        $label = New-Object System.Windows.Forms.Label
-        $label.Location = [System.Drawing.Point]::new(10, 20)
-        $label.Size = [System.Drawing.Size]::new(380, 20)
-        $label.Text = 'Enter the Undervolt for each core:'
-        $label.ForeColor = 'White'
-        $form.Controls.Add($label)
-
-        # Create the radio buttons
-        $radioButtons = @()
-        $values = @(-10, -20, -30)
-        for ($i = 0; $i -lt $values.Count; $i++) {
-          $radioButton = New-Object System.Windows.Forms.RadioButton
-          $radioButton.Location = [System.Drawing.Point]::new(200, 40 + $i * 30)
-          $radioButton.Size = [System.Drawing.Size]::new(60, 20)
-          $radioButton.ForeColor = 'White'
-          $radioButton.Text = $values[$i].ToString()
-
-          # Create a closure to capture the correct radio button object
-          $eventHandler = {
-            $selectedRadioButton = $this
-            $selectedValue = $selectedRadioButton.Text
-            foreach ($textBox in $textboxes) {
-              $textBox.Text = $selectedValue
-            }
-          }
-          $radioButton.Add_Click($eventHandler)
-
-          $form.Controls.Add($radioButton)
-          $radioButtons += $radioButton
-        }
-
-        # Create the text boxes with labels
-        $textBoxes = @()
-        for ($i = 0; $i -lt $cpuCores; $i++) {
-          $coreNumber = $i
-          $coreLabel = 'Core ' + $coreNumber
-    
-          # Create the label
-          $coreLabelControl = New-Object System.Windows.Forms.Label
-          $coreLabelControl.Location = [System.Drawing.Point]::new(10, 40 + $i * 30)
-          $coreLabelControl.Size = [System.Drawing.Size]::new(60, 20)
-          $coreLabelControl.Text = $coreLabel
-          $coreLabelControl.ForeColor = 'White'
-          $form.Controls.Add($coreLabelControl)
-    
-          # Create the text box
-          $textBox = New-Object System.Windows.Forms.TextBox
-          $textBox.Location = [System.Drawing.Point]::new(80, 40 + $i * 30)
-          $textBox.Size = [System.Drawing.Size]::new(60, 20)
-          $textBox.MaxLength = 3
-          $form.Controls.Add($textBox)
-          $textBoxes += $textBox
-        }
-
-        # Create the button
-        $button = New-Object System.Windows.Forms.Button
-        $button.Location = [System.Drawing.Point]::new(150, 40 + $cpuCores * 30)
-        $button.Size = [System.Drawing.Size]::new(100, 30)
-        $button.ForeColor = 'White'
-        $button.BackColor = [System.Drawing.Color]::FromArgb(30, 30, 30)
-        $button.Text = 'Apply'
-        $button.Add_Click({
-
-            #add pbo2 tuner to defender exclusions as the driver it uses is flagged as a threat
-            try {
-              $exclusionPaths = (Get-MpPreference -ErrorAction Stop).ExclusionPath
-              if ('C:\Program Files\PBOTuner' -notin $exclusionPaths) {
-                Write-Status -Message 'mpware skipped the automatic Microsoft Defender exclusion for PBOTuner.' -Type Warning
-      
-              }
-            }
-            catch {
-              #defender disabled or stripped
-            }
-
-            Invoke-RestMethod 'https://github.com/MP7BDO/mpware/archive/refs/heads/main.zip' -OutFile 'C:\PBO.zip'
-            Expand-Archive 'C:\PBO.zip' -DestinationPath 'C:\'
-            Remove-Item 'C:\PBO.zip' -Recurse -Force
-            Expand-Archive 'C:\PBO-main\PBOTuner.zip' -DestinationPath 'C:\Program Files'
-            Remove-Item 'C:\PBO-main' -Recurse -Force
-            $exePath = 'C:\Program Files\PBOTuner\PBO2 tuner.exe'
-
-            #format: (-)num cpu core undervolt ppt tdc edc 0
-            if ($checkBox.Checked) {
-
-              if ($limitBox1.Text -ne '') {
-                $ppt = $limitBox1.Text
-              }
-
-              if ($limitBox2.Text -ne '') {
-                $tdc = $limitBox2.Text
-              }
-
-              if ($limitBox3.Text -ne '') {
-                $edc = $limitBox3.Text
-
-              }
-
-              $values = ($textBoxes.ForEach({ $_.Text }) -join ' ') + ' ' + $ppt + ' ' + $tdc + ' ' + $edc + ' 0'
-            }
-            else {
-              $values = $textBoxes.ForEach({ $_.Text }) -join ' '
-
-            }
-            $taskName = 'PBO Tuner'
-
-
-            # Create a new scheduled task action to run the executable
-            $action = New-ScheduledTaskAction -Execute $exePath -Argument $values
-
-            # Create a new scheduled task trigger for user logon
-            $trigger = New-ScheduledTaskTrigger -AtLogOn
-
-
-            # Register the scheduled task using the User Principal Name
-            Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -User $env:USERNAME -RunLevel Highest -Force
-
-            $form.Close()
-          })
-        $form.Controls.Add($button)
-
-        # Show the form
-        $form.ShowDialog() | Out-Null
-
-      }
-      else {
-        Write-Status -Message 'PBO2 Tuner Needs Internet Connection...' -Type Error
-      }
-      
-      
-      
-    }
-      
-      
-      
     if ($checkbox29.Checked) {
       Write-Status -Message 'Excluding Drivers From Windows Update...' -Type Output
    
@@ -7386,11 +7110,6 @@ function OptionalTweaks {
       Reg.exe add 'HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked' /v '{b8cdcb65-b1bf-4b42-9428-1dfdb7ee92af}' /t REG_SZ /f
       Reg.exe add 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked' /v '{EE07CEF5-3441-4CFB-870A-4002C724783A}' /t REG_SZ /f
       Reg.exe add 'HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked' /v '{EE07CEF5-3441-4CFB-870A-4002C724783A}' /t REG_SZ /f
-    }
-
-    if ($checkbox64.Checked) {
-      Write-Status -Message 'Removing Scan with Defender...' -Type Output
-      Reg.exe add 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Blocked' /v '{09A47860-11B0-4DA5-AFA5-26D86198A780}' /t REG_SZ /d ' ' /f *>$null
     }
 
     if ($checkbox45.Checked) {
@@ -9430,13 +9149,6 @@ Windows Registry Editor Version 5.00
 Export-ModuleMember -Function W11Tweaks  
       
   
-function install-key {
-  Write-Status -Message 'mpware blocks Windows activation/KMS tooling. Use a legitimate Windows license and activation flow.' -Type Warning
-  Custom-MsgBox -message 'mpware does not include Windows activation or KMS tooling.' -type Warning | Out-Null
-}
-Export-ModuleMember -Function install-key 
-
-
 function UltimateCleanup {
 
   Add-Type -AssemblyName System.Windows.Forms
@@ -9951,18 +9663,20 @@ Export-ModuleMember -Function Run-Trusted
 # -------------- removed dotnet file searching too slow in most cases because of recursion required
       
 function Search-File($filter) {
-  #search in _FOLDERMUSTBEONCDRIVE first 
+  $roots = @($folder, $sysDrive) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+  if (-not $roots) { return $null }
 
-  #search c drive for only files to speed up searching
-  return (Get-ChildItem -Path $folder, $sysDrive -Filter $filter -Recurse -File -ErrorAction SilentlyContinue -Force | Where-Object Name -NotIn '$Recycle.Bin' | Select-Object -First 1).FullName
+  return (Get-ChildItem -Path $roots -Filter $filter -Recurse -File -ErrorAction SilentlyContinue -Force | Where-Object Name -NotIn '$Recycle.Bin' | Select-Object -First 1).FullName
 }
 Export-ModuleMember -Function Search-File
       
       
 
 function Search-Directory($filter) {
-  #search c drive for only directories
-  return (Get-ChildItem -Path $folder, $sysDrive -Filter $filter -Recurse -Directory -ErrorAction SilentlyContinue -Force | Where-Object Name -NotIn '$Recycle.Bin' | Select-Object -First 1).FullName
+  $roots = @($folder, $sysDrive) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+  if (-not $roots) { return $null }
+
+  return (Get-ChildItem -Path $roots -Filter $filter -Recurse -Directory -ErrorAction SilentlyContinue -Force | Where-Object Name -NotIn '$Recycle.Bin' | Select-Object -First 1).FullName
 }
 Export-ModuleMember -Function Search-Directory   
 
@@ -11118,12 +10832,12 @@ function Create-ModernButton {
     [scriptblock]$ClickAction,
     [string]$TooltipText,
     [string]$IconPath = $null,
-    [int]$CornerRadius = 8,
+    [int]$CornerRadius = 6,
     [int]$borderSize = 0,
     [int]$fontSize = 9,
-    [int]$r = 18, 
-    [int]$g = 19,
-    [int]$b = 27,
+    [int]$r = 22, 
+    [int]$g = 27,
+    [int]$b = 36,
     $DialogResult,
     $Visible = $true
   )
@@ -11166,15 +10880,15 @@ function Create-ModernButton {
   $button.ForeColor = [System.Drawing.Color]::White
   $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
   $button.FlatAppearance.BorderSize = $borderSize
-  $button.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(175, 195, 255)
-  $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(66, 70, 80)
+  $button.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(84, 163, 255)
+  $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(31, 39, 53)
   $button.FlatAppearance.MouseDownBackColor = [System.Drawing.Color]::FromArgb($r, $g, $b)
   $button.Cursor = [System.Windows.Forms.Cursors]::Hand
   $button.Font = New-Object System.Drawing.Font('Segoe UI', $fontSize, [System.Drawing.FontStyle]::Regular)
   $button.UseCompatibleTextRendering = $false
   $button.Tag = @{
     OriginalColor = [System.Drawing.Color]::FromArgb($r, $g, $b)
-    HoverColor    = [System.Drawing.Color]::FromArgb(66, 70, 80)
+    HoverColor    = [System.Drawing.Color]::FromArgb(31, 39, 53)
   }
 
   # Handle DPI-aware rounded corners with improved calculation
