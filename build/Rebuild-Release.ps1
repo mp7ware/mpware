@@ -1,7 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$PackageRoot,
-    [switch]$InstallPs2Exe
+    [string]$PackageRoot
 )
 
 Set-StrictMode -Version 2.0
@@ -12,46 +11,64 @@ if (-not $PackageRoot) {
     $PackageRoot = Join-Path $root 'dist\mpware'
 }
 
-$launcherScript = Join-Path $PackageRoot 'mpware.launcher.ps1'
 $launcherExe = Join-Path $PackageRoot 'mpware.exe'
 $zipPath = Join-Path $root 'dist\mpware.zip'
+$runtimeRoot = Join-Path $PackageRoot '_FOLDERMUSTBEONCDRIVE'
+$launcherSource = Join-Path $PSScriptRoot 'MpwareLauncher.cs'
+$launcherManifest = Join-Path $PSScriptRoot 'MpwareLauncher.manifest'
+$launcherIcon = Join-Path $runtimeRoot 'mpwareIcons\Powershell_black.ico'
 
-if (-not (Test-Path -LiteralPath $launcherScript)) {
-    throw "Missing launcher script: $launcherScript"
+if (-not (Test-Path -LiteralPath (Join-Path $runtimeRoot 'mpware.ps1'))) {
+    throw "Missing runtime script: $runtimeRoot"
+}
+if (-not (Test-Path -LiteralPath $launcherSource)) {
+    throw "Missing launcher source: $launcherSource"
 }
 
-$command = @(
-    Get-Command Invoke-PS2EXE -ErrorAction SilentlyContinue
-    Get-Command ps2exe -ErrorAction SilentlyContinue
-) | Select-Object -First 1
-
-if (-not $command -and $InstallPs2Exe) {
-    Install-Module ps2exe -Scope CurrentUser -Force
-    Import-Module ps2exe -Force
-    $command = @(
-        Get-Command Invoke-PS2EXE -ErrorAction SilentlyContinue
-        Get-Command ps2exe -ErrorAction SilentlyContinue
-    ) | Select-Object -First 1
+$csc = Get-Command csc.exe -ErrorAction SilentlyContinue
+if (-not $csc) {
+    $csc = Get-ChildItem 'C:\Windows\Microsoft.NET\Framework64','C:\Windows\Microsoft.NET\Framework' -Recurse -Filter csc.exe -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
 }
-
-if (-not $command) {
-    Write-Warning 'PS2EXE is not installed, so only the release zip will be refreshed.'
+if (-not $csc) {
+    throw 'Could not find csc.exe. Install .NET Framework developer tools or run on a standard Windows installation.'
 }
-else {
-    $params = @{
-        inputFile   = $launcherScript
-        outputFile  = $launcherExe
-        noConsole   = $true
-        title       = 'mpware'
-        description = 'mpware Windows 11 optimizer launcher'
-        product     = 'mpware'
-        company     = 'mpware'
-        version     = '0.1.0'
+$cscPath = if ($csc.PSObject.Properties.Name -contains 'Source') { $csc.Source } else { $csc.FullName }
+
+$runtimeZip = Join-Path ([System.IO.Path]::GetTempPath()) "mpware-runtime-$([guid]::NewGuid().ToString('N')).zip"
+try {
+    Compress-Archive -Path (Join-Path $runtimeRoot '*') -DestinationPath $runtimeZip -Force
+
+    $cscArgs = @(
+        '/nologo',
+        '/target:winexe',
+        "/out:$launcherExe",
+        "/resource:$runtimeZip,mpwareRuntimeZip",
+        '/reference:System.Windows.Forms.dll',
+        '/reference:System.Drawing.dll',
+        '/reference:System.IO.Compression.dll',
+        '/reference:System.IO.Compression.FileSystem.dll'
+    )
+
+    if (Test-Path -LiteralPath $launcherManifest) {
+        $cscArgs += "/win32manifest:$launcherManifest"
     }
-    & $command @params
+    if (Test-Path -LiteralPath $launcherIcon) {
+        $cscArgs += "/win32icon:$launcherIcon"
+    }
+
+    $cscArgs += $launcherSource
+    & $cscPath @cscArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "csc.exe failed with exit code $LASTEXITCODE"
+    }
+}
+finally {
+    Remove-Item -LiteralPath $runtimeZip -Force -ErrorAction SilentlyContinue
 }
 
 Compress-Archive -Path (Join-Path $PackageRoot '*') -DestinationPath $zipPath -Force
 Write-Host "Refreshed release package: $PackageRoot"
+Write-Host "Refreshed exe: $launcherExe"
 Write-Host "Refreshed zip: $zipPath"
-

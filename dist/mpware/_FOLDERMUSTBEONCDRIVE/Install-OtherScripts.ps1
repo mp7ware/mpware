@@ -89,19 +89,8 @@ $checkbox2.Font = New-Object System.Drawing.Font('Segoe UI', 9)
 $checkbox2.Checked = $false
 $Form.Controls.Add($checkbox2) 
 
-$checkbox3 = New-Object System.Windows.Forms.CheckBox
-$checkbox3.Location = new-object System.Drawing.Size(20, 140)
-$checkbox3.Size = new-object System.Drawing.Size(190, 30)
-$checkbox3.Text = 'Strip Windows Defender (blocked)'
-$checkbox3.ForeColor = 'White'
-$checkbox3.BackColor = [System.Drawing.Color]::Transparent
-$checkbox3.Font = New-Object System.Drawing.Font('Segoe UI', 9)
-$checkbox3.Checked = $false
-$checkbox3.Enabled = $false
-$Form.Controls.Add($checkbox3) 
-
 $checkbox4 = New-Object System.Windows.Forms.CheckBox
-$checkbox4.Location = new-object System.Drawing.Size(20, 170)
+$checkbox4.Location = new-object System.Drawing.Size(20, 140)
 $checkbox4.Size = new-object System.Drawing.Size(190, 30)
 $checkbox4.Text = 'Repair Bad Tweaks'
 $checkbox4.ForeColor = 'White'
@@ -111,7 +100,7 @@ $checkbox4.Checked = $false
 $Form.Controls.Add($checkbox4)
 
 $checkbox5 = New-Object System.Windows.Forms.CheckBox
-$checkbox5.Location = new-object System.Drawing.Size(20, 200)
+$checkbox5.Location = new-object System.Drawing.Size(20, 170)
 $checkbox5.Size = new-object System.Drawing.Size(190, 30)
 $checkbox5.Text = 'Remove Windows AI'
 $checkbox5.ForeColor = 'White'
@@ -124,7 +113,7 @@ $yesCheckboxes = @()
 $noCheckboxes = @()
 
 #create no source code checkboxes
-for ($i = 0; $i -lt 5; $i++) {
+for ($i = 0; $i -lt 4; $i++) {
     $checkboxno = New-Object System.Windows.Forms.CheckBox
     $checkboxno.Text = ''
     $checkboxno.BackColor = [System.Drawing.Color]::Transparent
@@ -135,7 +124,7 @@ for ($i = 0; $i -lt 5; $i++) {
 }
 
 #create yes source code checkboxes
-for ($i = 0; $i -lt 5; $i++) {
+for ($i = 0; $i -lt 4; $i++) {
     $checkboxyes = New-Object System.Windows.Forms.CheckBox
     $checkboxyes.Text = ''
     $checkboxyes.Checked = $false
@@ -214,35 +203,10 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
             [System.IO.File]::WriteAllBytes($Shortcut.FullName, $bytes)
         }
 
-        if ($checkbox3.Checked) {
-            [System.Windows.Forms.MessageBox]::Show('mpware blocks Windows Defender stripping tools.', 'mpware', 'OK', 'Warning') | Out-Null
-            $checkbox3.Checked = $false
-        }
-
-        if ($false) {
-            $sourceUri = 'https://raw.githubusercontent.com/MP7BDO/mpware/DefenderProTools/main/StripDefenderV3.ps1'
-            #check if source code should be included
-            $source = $yesCheckboxes[2].Checked
-            if ($source) {
-                Invoke-WebRequest -Uri $sourceUri -UseBasicParsing -OutFile "$env:USERPROFILE\Desktop\StripDefenderV3.ps1"
-            }
-
-
-            $WshShell = New-Object -comObject WScript.Shell
-            $Shortcut = $WshShell.CreateShortcut("$env:USERPROFILE\Desktop\StripDefender.lnk")
-            $Shortcut.TargetPath = 'powershell.exe'
-            $Shortcut.Arguments = '-ExecutionPolicy Bypass -c iwr https://raw.githubusercontent.com/MP7BDO/mpware/DefenderProTools/main/StripDefenderV3.ps1 | iex'
-            $Shortcut.Save()
-            #run as admin
-            $bytes = [System.IO.File]::ReadAllBytes($Shortcut.FullName)
-            $bytes[0x15] = $bytes[0x15] -bor 0x20
-            [System.IO.File]::WriteAllBytes($Shortcut.FullName, $bytes)
-        }
-
         if ($checkbox4.Checked) {
             $sourceUri = 'https://raw.githubusercontent.com/MP7BDO/mpware/RepairBadTweaks/main/RepairTweaks.ps1'
             #check if source code should be included
-            $source = $yesCheckboxes[3].Checked
+            $source = $yesCheckboxes[2].Checked
             if ($source) {
                 Invoke-WebRequest -Uri $sourceUri -UseBasicParsing -OutFile "$env:USERPROFILE\Desktop\RepairTweaks.ps1"
             }
@@ -262,7 +226,7 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
         if ($checkbox5.Checked) {
             $sourceUri = 'https://raw.githubusercontent.com/MP7BDO/mpware/RemoveWindowsAI/main/RemoveWindowsAi.ps1'
             #check if source code should be included
-            $source = $yesCheckboxes[4].Checked
+            $source = $yesCheckboxes[3].Checked
             if ($source) {
                 Invoke-WebRequest -Uri $sourceUri -UseBasicParsing -OutFile "$env:USERPROFILE\Desktop\RemoveWindowsAi.ps1"
             }

@@ -1,5 +1,21 @@
+$Global:mpwareScriptPath = if ($PSCommandPath) {
+    $PSCommandPath
+}
+elseif ($MyInvocation.MyCommand.Path) {
+    $MyInvocation.MyCommand.Path
+}
+else {
+    $null
+}
+
 If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
-    Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
+    if ($Global:mpwareScriptPath) {
+        Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $Global:mpwareScriptPath) -Verb RunAs
+    }
+    else {
+        Write-Warning 'mpware could not find its runtime script path. Launch mpware.exe again, or extract the release zip before running.'
+        Start-Sleep -Seconds 4
+    }
     Exit	
 }
 
@@ -196,21 +212,43 @@ $fullTitle = '~' * [Math]::Floor($padding) + ' ' + 'WELCOME TO mpware' + ' ' + '
 Write-Host $fullTitle -BackgroundColor White -ForegroundColor Black
 
 #get system drive letter
-$Global:sysDrive = $env:SystemDrive + '\'
-#search on system drive if mpware.ps1 is not in _FOLDERMUSTBEONCDRIVE
-if ($PSScriptRoot -like '*_FOLDERMUSTBEONCDRIVE') {
-    $Global:folder = $PSScriptRoot
-    Get-ChildItem $Global:folder -Recurse | Unblock-File
-}
-else {
-    Write-Host "Searching for functions in $sysDrive"
-    $Global:folder = $PSScriptRoot
-    Get-ChildItem $Global:folder -Recurse | Unblock-File
-}
-$pack = $folder -replace '\\_FOLDERMUSTBEONCDRIVE' , ''
+$Global:sysDrive = if ($env:SystemDrive) { $env:SystemDrive.TrimEnd('\') + '\' } else { 'C:\' }
 
-# mpware: automatic Microsoft Defender exclusions are intentionally disabled.
-#check if settings file is made#check if settings file is made
+function Resolve-mpwareRuntimeRoot {
+    $scriptFolder = if ($Global:mpwareScriptPath) {
+        Split-Path -Parent $Global:mpwareScriptPath
+    }
+    else {
+        $null
+    }
+
+    $candidatePaths = @(
+        $PSScriptRoot,
+        $scriptFolder,
+        (Get-Location -PSProvider FileSystem).Path
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+
+    foreach ($candidate in $candidatePaths) {
+        if (Test-Path -LiteralPath (Join-Path $candidate 'zFunctions.psm1')) {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+
+        $childRuntime = Join-Path $candidate '_FOLDERMUSTBEONCDRIVE'
+        if (Test-Path -LiteralPath (Join-Path $childRuntime 'zFunctions.psm1')) {
+            return (Resolve-Path -LiteralPath $childRuntime).Path
+        }
+    }
+
+    return $null
+}
+
+$Global:folder = Resolve-mpwareRuntimeRoot
+if ($Global:folder) {
+    Get-ChildItem -LiteralPath $Global:folder -Recurse -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue
+}
+$pack = if ($Global:folder) { Split-Path -Parent $Global:folder } else { $null }
+
+#check if settings file is made
 $settingsContent = @'
 #mpware SCRIPT SETTINGS
 dontCheckUpdates = 0
@@ -275,7 +313,6 @@ $configContent = @'
 installPackages = 0
 registryTweaks = 0
 scheduledTasks = 0
-gpDefender = 0
 gpUpdates = 0
 gpTel = 0
 disableServices = 0
@@ -301,7 +338,6 @@ opremoveMouseSoundSchemes = 0
 opremoveRecycle = 0
 opblockRazerAsus = 0
 opremoveNetworkIcon = 0
-opapplyPBO = 0
 opnoDriversInUpdate = 0
 opSecUpdatesOnly = 0
 opPauseUpdates = 0
@@ -343,7 +379,6 @@ conDisplay = 0
 conExtractAll = 0
 conTroubleshootComp = 0
 conIncludeLibrary = 0
-conScanDefender = 0
 dialogAppUninstall = 0
 dialogMergeConflicts = 0
 dialogSyncedFileWarn = 0
@@ -468,7 +503,7 @@ do {
     # Create a form
     $form = New-Object Windows.Forms.Form
     $form.Text = 'mpware'
-    $form.Size = New-Object Drawing.Size(610, 450)
+    $form.Size = New-Object Drawing.Size(760, 520)
     # $form.BackColor = [System.Drawing.Color]::FromArgb(33, 33, 33) # #212121
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 9)
 
@@ -476,8 +511,14 @@ do {
     $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
     $propInfo.SetValue($form, $true, $null)
 
-    $startColor = [System.Drawing.Color]::FromArgb(18, 18, 18)   #rgb(99, 119, 163)
-    $endColor = [System.Drawing.Color]::FromArgb(0, 0, 0)       #rgb(0, 0, 0)
+    $startColor = [System.Drawing.Color]::FromArgb(8, 10, 14)
+    $endColor = [System.Drawing.Color]::FromArgb(2, 4, 8)
+    $panelColor = [System.Drawing.Color]::FromArgb(12, 15, 21)
+    $panelSoftColor = [System.Drawing.Color]::FromArgb(15, 20, 28)
+    $buttonBaseColor = [System.Drawing.Color]::FromArgb(22, 27, 36)
+    $buttonActiveColor = [System.Drawing.Color]::FromArgb(37, 49, 68)
+    $accentColor = [System.Drawing.Color]::FromArgb(84, 163, 255)
+    $mutedTextColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
 
     # Override the form's paint event to apply the gradient
     $form.Add_Paint({
@@ -501,21 +542,45 @@ do {
 
     # Create the sidebar panel
     $sidebarPanel = New-Object System.Windows.Forms.Panel
-    $sidebarPanel.Size = New-Object Drawing.Size(150, 410)
+    $sidebarPanel.Size = New-Object Drawing.Size(180, 480)
     $sidebarPanel.Location = New-Object Drawing.Point(0, 0)
-    $sidebarPanel.BackColor = [System.Drawing.Color]::FromArgb(0, 0, 0) 
+    $sidebarPanel.BackColor = $panelColor
     $form.Controls.Add($sidebarPanel)
 
     $type = $sidebarPanel.GetType()
     $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
     $propInfo.SetValue($sidebarPanel, $true, $null)
 
+    $brandLabel = New-Object Windows.Forms.Label
+    $brandLabel.Text = 'mpware'
+    $brandLabel.Location = New-Object Drawing.Point(18, 18)
+    $brandLabel.Size = New-Object Drawing.Size(140, 30)
+    $brandLabel.ForeColor = [System.Drawing.Color]::White
+    $brandLabel.BackColor = [System.Drawing.Color]::Transparent
+    $brandLabel.Font = New-Object System.Drawing.Font('Segoe UI', 18, [System.Drawing.FontStyle]::Bold)
+    $sidebarPanel.Controls.Add($brandLabel)
+
+    $buildLabel = New-Object Windows.Forms.Label
+    $buildLabel.Text = 'windows tuning'
+    $buildLabel.Location = New-Object Drawing.Point(20, 50)
+    $buildLabel.Size = New-Object Drawing.Size(140, 18)
+    $buildLabel.ForeColor = $mutedTextColor
+    $buildLabel.BackColor = [System.Drawing.Color]::Transparent
+    $buildLabel.Font = New-Object System.Drawing.Font('Segoe UI', 8)
+    $sidebarPanel.Controls.Add($buildLabel)
+
+    $accentBar = New-Object System.Windows.Forms.Panel
+    $accentBar.Location = New-Object Drawing.Point(18, 74)
+    $accentBar.Size = New-Object Drawing.Size(124, 2)
+    $accentBar.BackColor = $accentColor
+    $sidebarPanel.Controls.Add($accentBar)
+
     # Create the main content panel
     $mainPanel = New-Object System.Windows.Forms.Panel
-    $mainPanel.Size = New-Object Drawing.Size(450, 410)
-    $mainPanel.Location = New-Object Drawing.Point(150, 0)
-    # $mainPanel.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 45) # #2D2D2D
-    $mainPanel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle # Subtle border for depth
+    $mainPanel.Size = New-Object Drawing.Size(565, 480)
+    $mainPanel.Location = New-Object Drawing.Point(180, 0)
+    $mainPanel.BackColor = $panelSoftColor
+    $mainPanel.BorderStyle = [System.Windows.Forms.BorderStyle]::None
     $form.Controls.Add($mainPanel)
 
     $type = $mainPanel.GetType()
@@ -539,7 +604,7 @@ do {
 
     # Create panels for each section (Windows Tweaks, Post Tweak Setup, Utilities)
     $windowsTweaksPanel = New-Object System.Windows.Forms.Panel
-    $windowsTweaksPanel.Size = New-Object Drawing.Size(450, 410)
+    $windowsTweaksPanel.Size = New-Object Drawing.Size(565, 480)
     $windowsTweaksPanel.Location = New-Object Drawing.Point(0, 0)
     # $windowsTweaksPanel.BackColor = [System.Drawing.Color]::FromArgb(51, 51, 51) # #333333
 
@@ -562,7 +627,7 @@ do {
         })
 
     $postTweakSetupPanel = New-Object System.Windows.Forms.Panel
-    $postTweakSetupPanel.Size = New-Object Drawing.Size(450, 410)
+    $postTweakSetupPanel.Size = New-Object Drawing.Size(565, 480)
     $postTweakSetupPanel.Location = New-Object Drawing.Point(0, 0)
     # $postTweakSetupPanel.BackColor = [System.Drawing.Color]::FromArgb(51, 51, 51) # #333333
     $postTweakSetupPanel.Visible = $false
@@ -586,7 +651,7 @@ do {
         })
 
     $utilitiesPanel = New-Object System.Windows.Forms.Panel
-    $utilitiesPanel.Size = New-Object Drawing.Size(450, 410)
+    $utilitiesPanel.Size = New-Object Drawing.Size(565, 480)
     $utilitiesPanel.Location = New-Object Drawing.Point(0, 0)
     # $utilitiesPanel.BackColor = [System.Drawing.Color]::FromArgb(51, 51, 51) # #333333
     $utilitiesPanel.Visible = $false
@@ -611,57 +676,57 @@ do {
 
 
         
-    $windowsTweaksButton = Create-ModernButton -Text '  Tweaks' -Location (New-Object Drawing.Point(10, 20)) -Size (New-Object Drawing.Size(130, 40)) -ClickAction {
+    $windowsTweaksButton = Create-ModernButton -Text '  Optimize' -Location (New-Object Drawing.Point(15, 95)) -Size (New-Object Drawing.Size(150, 40)) -ClickAction {
         $windowsTweaksPanel.Visible = $true
         $postTweakSetupPanel.Visible = $false
         $utilitiesPanel.Visible = $false
-        $windowsTweaksButton.BackColor = [System.Drawing.Color]::FromArgb(69, 73, 85)
+        $windowsTweaksButton.BackColor = $buttonActiveColor
         $windowsTweaksButton.Tag = 'Active'
-        $postTweakSetupButton.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+        $postTweakSetupButton.BackColor = $buttonBaseColor
         $postTweakSetupButton.Tag = 'Inactive'
-        $utilitiesButton.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+        $utilitiesButton.BackColor = $buttonBaseColor
         $utilitiesButton.Tag = 'Inactive'
         $this.Focus()
-    } -IconPath "$iconDir\optionalTweaks.png" -borderSize 0 -fontSize 10 -r 47 -g 49 -b 58
+    } -IconPath "$iconDir\optionalTweaks.png" -borderSize 0 -fontSize 10 -r 22 -g 27 -b 36
     $sidebarPanel.Controls.Add($windowsTweaksButton)
 
-    $postTweakSetupButton = Create-ModernButton -Text '  Install' -Location (New-Object Drawing.Point(10, 80)) -Size (New-Object Drawing.Size(130, 40)) -ClickAction {
+    $postTweakSetupButton = Create-ModernButton -Text '  Apps' -Location (New-Object Drawing.Point(15, 145)) -Size (New-Object Drawing.Size(150, 40)) -ClickAction {
         $windowsTweaksPanel.Visible = $false
         $postTweakSetupPanel.Visible = $true
         $utilitiesPanel.Visible = $false
-        $windowsTweaksButton.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+        $windowsTweaksButton.BackColor = $buttonBaseColor
         $windowsTweaksButton.Tag = 'Inactive'
-        $postTweakSetupButton.BackColor = [System.Drawing.Color]::FromArgb(69, 73, 85)
+        $postTweakSetupButton.BackColor = $buttonActiveColor
         $postTweakSetupButton.Tag = 'Active'
-        $utilitiesButton.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+        $utilitiesButton.BackColor = $buttonBaseColor
         $utilitiesButton.Tag = 'Inactive'
         $this.Focus()
-    } -IconPath "$iconDir\postInstall.png" -borderSize 0 -fontSize 10 -r 47 -g 49 -b 58 
+    } -IconPath "$iconDir\postInstall.png" -borderSize 0 -fontSize 10 -r 22 -g 27 -b 36 
     $sidebarPanel.Controls.Add($postTweakSetupButton)
 
-    $utilitiesButton = Create-ModernButton -Text '  Utilities' -Location (New-Object Drawing.Point(10, 140)) -Size (New-Object Drawing.Size(130, 40)) -ClickAction {
+    $utilitiesButton = Create-ModernButton -Text '  Tools' -Location (New-Object Drawing.Point(15, 195)) -Size (New-Object Drawing.Size(150, 40)) -ClickAction {
         $windowsTweaksPanel.Visible = $false
         $postTweakSetupPanel.Visible = $false
         $utilitiesPanel.Visible = $true
-        $windowsTweaksButton.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+        $windowsTweaksButton.BackColor = $buttonBaseColor
         $windowsTweaksButton.Tag = 'Inactive'
-        $postTweakSetupButton.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+        $postTweakSetupButton.BackColor = $buttonBaseColor
         $postTweakSetupButton.Tag = 'Inactive'
-        $utilitiesButton.BackColor = [System.Drawing.Color]::FromArgb(69, 73, 85)
+        $utilitiesButton.BackColor = $buttonActiveColor
         $utilitiesButton.Tag = 'Active'
         $this.Focus()
-    } -IconPath "$iconDir\tweaks.png" -borderSize 0 -fontSize 10 -r 47 -g 49 -b 58 
+    } -IconPath "$iconDir\tweaks.png" -borderSize 0 -fontSize 10 -r 22 -g 27 -b 36 
     $sidebarPanel.Controls.Add($utilitiesButton)
    
    
 
     # Settings button in sidebar
     $settingsButton = New-Object Windows.Forms.Button
-    $settingsButton.Location = New-Object Drawing.Point(5, 380)
+    $settingsButton.Location = New-Object Drawing.Point(15, 435)
     $settingsButton.Size = New-Object Drawing.Size(30, 30)
     $settingsButton.Cursor = 'Hand'
     $settingsButton.Add_Click({ Display-Settings })
-    $settingsButton.BackColor = [System.Drawing.Color]::FromArgb(0, 0, 0) # #1A1A1A
+    $settingsButton.BackColor = $panelColor
     $imagePath = "$iconDir\settingsIcon.png"
     $image = [System.Drawing.Image]::FromFile($imagePath)
     $settingsButton.Image = New-Object System.Drawing.Bitmap $image, 24, 25
@@ -673,7 +738,7 @@ do {
     # Info button in sidebar
     $urlfeatures = 'https://github.com/MP7BDO/mpware/blob/main/features.md'
     $infobutton = New-Object Windows.Forms.Button
-    $infobutton.Location = New-Object Drawing.Point(35, 380)
+    $infobutton.Location = New-Object Drawing.Point(52, 435)
     $infobutton.Size = New-Object Drawing.Size(30, 30)
     $infobutton.Cursor = 'Hand'
     $infobutton.Add_Click({
@@ -684,7 +749,7 @@ do {
                 Write-Host 'No Internet Connected...' -ForegroundColor Red
             }
         })
-    $infobutton.BackColor = [System.Drawing.Color]::FromArgb(0, 0, 0) # #1A1A1A
+    $infobutton.BackColor = $panelColor
     $image = [System.Drawing.Image]::FromFile('C:\Windows\System32\SecurityAndMaintenance.png')
     $infobutton.Image = New-Object System.Drawing.Bitmap $image, 24, 25
     $infobutton.ImageAlign = [System.Drawing.ContentAlignment]::MiddleCenter
@@ -721,7 +786,7 @@ do {
         gpTweaks
         Get-EnabledOptions
         $form.Visible = $true
-    } -TooltipText 'Disable Updates, Defender, Telemetry.' -IconPath "$iconDir\groupPolicy.png"
+    } -TooltipText 'Applies update and telemetry policy tweaks.' -IconPath "$iconDir\groupPolicy.png"
     $windowsTweaksPanel.Controls.Add($button4)
 
     $button5 = Create-ModernButton -Text '  Disable Services' -Location (New-Object Drawing.Point(10, 130)) -Size (New-Object Drawing.Size($buttonWidth, $buttonHeight)) -ClickAction {
@@ -861,13 +926,6 @@ do {
         $form.Visible = $true
     } -TooltipText 'Performs a thorough system cleanup.' -IconPath "$iconDir\delete.png"
     $postTweakSetupPanel.Controls.Add($cleanup)
-
-    $activate = Create-ModernButton -Text '  Activate Windows' -Location (New-Object Drawing.Point(($startX + $buttonWidth + $buttonSpacing), 170)) -Size (New-Object Drawing.Size($buttonWidth, $buttonHeight)) -ClickAction {
-        $form.Visible = $false
-        install-key
-        $form.Visible = $true
-    } -TooltipText 'Activation/KMS tooling is blocked in mpware.' -IconPath "$iconDir\activation.png"
-    $postTweakSetupPanel.Controls.Add($activate)
 
     # Utilities Panel
     $utilitiesLabel = New-Object Windows.Forms.Label

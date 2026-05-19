@@ -23,6 +23,10 @@ function RunTweaks($enabledSettings) {
                 break
             }
             'gp*' {
+                if ($setting -eq 'gpDefender') {
+                    Write-Host "Skipping removed option : [$setting]" -ForegroundColor Yellow
+                    break
+                }
                 $command = "gpTweaks -Autorun 1 -$setting 1"
                 Invoke-Expression $command 
                 break
@@ -57,11 +61,19 @@ function RunTweaks($enabledSettings) {
                 break
             }
             'op*' {
+                if ($setting -eq 'opapplyPBO') {
+                    Write-Host "Skipping removed option : [$setting]" -ForegroundColor Yellow
+                    break
+                }
                 $command = "OptionalTweaks -Autorun 1 -$setting 1"
                 Invoke-Expression $command 
                 break
             }
             'con*' {
+                if ($setting -eq 'conScanDefender') {
+                    Write-Host "Skipping removed option : [$setting]" -ForegroundColor Yellow
+                    break
+                }
                 $command = "OptionalTweaks -Autorun 1 -$setting 1"
                 Invoke-Expression $command 
                 break
