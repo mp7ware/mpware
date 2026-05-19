@@ -9,9 +9,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using IOPath = System.IO.Path;
@@ -144,15 +144,14 @@ namespace mpwareLauncher
 
     internal sealed class DashboardWindow : Window
     {
-        private readonly Brush _appBackground = BrushFromRgb(5, 7, 12);
-        private readonly Brush _panel = BrushFromRgb(10, 13, 20);
-        private readonly Brush _panelSoft = BrushFromRgb(15, 19, 28);
-        private readonly Brush _panelHover = BrushFromRgb(24, 31, 45);
-        private readonly Brush _text = BrushFromRgb(242, 246, 255);
+        private readonly Brush _appBackground = BrushFromRgb(6, 8, 13);
+        private readonly Brush _panel = BrushFromRgb(11, 14, 20);
+        private readonly Brush _panelSoft = BrushFromRgb(16, 20, 28);
+        private readonly Brush _panelHover = BrushFromRgb(25, 31, 42);
+        private readonly Brush _text = BrushFromRgb(238, 242, 249);
         private readonly Brush _muted = BrushFromRgb(148, 163, 184);
-        private readonly Brush _accent = BrushFromRgb(33, 150, 255);
-        private readonly Brush _accent2 = BrushFromRgb(102, 88, 255);
-        private readonly Brush _track = BrushFromRgb(31, 36, 47);
+        private readonly Brush _accent = BrushFromRgb(59, 130, 246);
+        private readonly Brush _track = BrushFromRgb(38, 45, 58);
 
         private Grid _content;
         private StackPanel _logPanel;
@@ -192,6 +191,10 @@ namespace mpwareLauncher
             Foreground = _text;
             FontFamily = new FontFamily("Segoe UI");
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            UseLayoutRounding = true;
+            SnapsToDevicePixels = true;
+            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+            TextOptions.SetTextRenderingMode(this, TextRenderingMode.ClearType);
 
             BuildShell();
             ShowHome();
@@ -209,14 +212,16 @@ namespace mpwareLauncher
         private void BuildShell()
         {
             Grid root = new Grid();
-            root.Background = new LinearGradientBrush(ColorFromRgb(6, 9, 18), ColorFromRgb(0, 0, 0), 45);
-            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(218) });
+            root.Background = _appBackground;
+            root.SnapsToDevicePixels = true;
+            root.UseLayoutRounding = true;
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(204) });
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             Content = root;
 
             Border sidebar = new Border();
-            sidebar.Background = new LinearGradientBrush(ColorFromRgb(8, 12, 22), ColorFromRgb(2, 5, 12), 90);
-            sidebar.BorderBrush = BrushFromRgb(23, 31, 45);
+            sidebar.Background = BrushFromRgb(8, 10, 16);
+            sidebar.BorderBrush = BrushFromRgb(27, 34, 47);
             sidebar.BorderThickness = new Thickness(0, 0, 1, 0);
             Grid.SetColumn(sidebar, 0);
             root.Children.Add(sidebar);
@@ -224,7 +229,7 @@ namespace mpwareLauncher
             StackPanel nav = new StackPanel { Margin = new Thickness(18, 24, 18, 18) };
             sidebar.Child = nav;
 
-            TextBlock logo = TextBlock("mpware", 28, FontWeights.Bold, _text);
+            TextBlock logo = TextBlock("mpware", 27, FontWeights.Bold, _text);
             logo.Margin = new Thickness(8, 0, 0, 2);
             nav.Children.Add(logo);
             TextBlock tagline = TextBlock("windows tuning", 12, FontWeights.Normal, _muted);
@@ -295,6 +300,8 @@ namespace mpwareLauncher
             button.Background = String.Equals(label, _activePage, StringComparison.OrdinalIgnoreCase) ? _panelHover : Brushes.Transparent;
             button.FontWeight = FontWeights.SemiBold;
             button.Cursor = Cursors.Hand;
+            button.Template = ButtonTemplate(new CornerRadius(8));
+            button.SnapsToDevicePixels = true;
             button.Click += delegate { _activePage = label; action(); };
             return button;
         }
@@ -342,7 +349,7 @@ namespace mpwareLauncher
             Grid.SetRow(rail, 1);
             Grid fillGrid = new Grid();
             rail.Child = fillGrid;
-            _healthFill = new Rectangle { Fill = new LinearGradientBrush(ColorFromRgb(0, 122, 255), ColorFromRgb(255, 110, 28), 90), RadiusX = 9, RadiusY = 9, VerticalAlignment = VerticalAlignment.Bottom, Height = 120 };
+            _healthFill = new Rectangle { Fill = _accent, RadiusX = 9, RadiusY = 9, VerticalAlignment = VerticalAlignment.Bottom, Height = 120 };
             fillGrid.Children.Add(_healthFill);
             healthGrid.Children.Add(rail);
             _healthScore = TextBlock("Good", 14, FontWeights.Bold, _text);
@@ -625,20 +632,13 @@ namespace mpwareLauncher
                 line.X2 = cx + Math.Cos(angle) * r2;
                 line.Y2 = cy + Math.Sin(angle) * r2;
                 line.StrokeThickness = 3;
+                line.SnapsToDevicePixels = true;
                 line.StrokeStartLineCap = PenLineCap.Round;
                 line.StrokeEndLineCap = PenLineCap.Round;
                 line.Stroke = (pct * 100 <= value) ? _accent : _track;
-                line.Opacity = (pct * 100 <= value) ? 0.95 : 0.55;
+                line.Opacity = (pct * 100 <= value) ? 1.0 : 0.65;
                 canvas.Children.Add(line);
             }
-
-            Ellipse glow = new Ellipse();
-            glow.Width = 150;
-            glow.Height = 42;
-            glow.Fill = new RadialGradientBrush(ColorFromArgb(115, 18, 83, 255), ColorFromArgb(0, 18, 83, 255));
-            Canvas.SetLeft(glow, 35);
-            Canvas.SetTop(glow, 94);
-            canvas.Children.Add(glow);
         }
 
         private void LaunchFullRuntime()
@@ -893,11 +893,11 @@ namespace mpwareLauncher
         private Border Card()
         {
             Border border = new Border();
-            border.CornerRadius = new CornerRadius(16);
+            border.CornerRadius = new CornerRadius(10);
             border.Background = _panel;
-            border.BorderBrush = BrushFromRgb(25, 31, 44);
+            border.BorderBrush = BrushFromRgb(31, 39, 54);
             border.BorderThickness = new Thickness(1);
-            border.Effect = new DropShadowEffect { Color = ColorFromRgb(0, 0, 0), BlurRadius = 18, ShadowDepth = 0, Opacity = 0.32 };
+            border.SnapsToDevicePixels = true;
             return border;
         }
 
@@ -907,7 +907,7 @@ namespace mpwareLauncher
             box.Width = 38;
             box.Height = 38;
             box.Margin = new Thickness(0, 0, 0, 16);
-            box.CornerRadius = new CornerRadius(10);
+            box.CornerRadius = new CornerRadius(8);
             box.Background = _panelSoft;
             TextBlock glyph = TextBlock("◆", 16, FontWeights.Bold, _accent);
             glyph.HorizontalAlignment = HorizontalAlignment.Center;
@@ -929,8 +929,31 @@ namespace mpwareLauncher
             b.BorderThickness = new Thickness(1);
             b.FontWeight = FontWeights.SemiBold;
             b.Cursor = Cursors.Hand;
+            b.Template = ButtonTemplate(new CornerRadius(8));
+            b.SnapsToDevicePixels = true;
             b.Click += handler;
             return b;
+        }
+
+        private ControlTemplate ButtonTemplate(CornerRadius radius)
+        {
+            ControlTemplate template = new ControlTemplate(typeof(Button));
+            FrameworkElementFactory border = new FrameworkElementFactory(typeof(Border));
+            border.SetValue(Border.CornerRadiusProperty, radius);
+            border.SetValue(Border.SnapsToDevicePixelsProperty, true);
+            border.SetBinding(Border.BackgroundProperty, new Binding("Background") { RelativeSource = RelativeSource.TemplatedParent });
+            border.SetBinding(Border.BorderBrushProperty, new Binding("BorderBrush") { RelativeSource = RelativeSource.TemplatedParent });
+            border.SetBinding(Border.BorderThicknessProperty, new Binding("BorderThickness") { RelativeSource = RelativeSource.TemplatedParent });
+
+            FrameworkElementFactory presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            presenter.SetValue(ContentPresenter.SnapsToDevicePixelsProperty, true);
+            presenter.SetBinding(ContentPresenter.MarginProperty, new Binding("Padding") { RelativeSource = RelativeSource.TemplatedParent });
+
+            border.AppendChild(presenter);
+            template.VisualTree = border;
+            return template;
         }
 
         private TextBlock TextBlock(string text, double size, FontWeight weight, Brush brush)
