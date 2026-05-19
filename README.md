@@ -9,7 +9,7 @@ The current release package is:
 
 `mpware.exe` embeds the PowerShell runtime and can extract it into the current user's local app data folder when the sidecar runtime folder is not beside it.
 
-The launcher requests Administrator on start. Registry Tweaks create a Windows System Restore point before import, then apply selected registry groups, run required follow-up actions such as solid-black wallpaper refresh, Ultimate Performance activation, or timer-resolution setup, and restart Explorer.
+The launcher requests Administrator on start. Registry Tweaks create a Windows System Restore point before import, then apply selected registry groups, run required follow-up actions such as solid-black wallpaper refresh, Ultimate Performance activation, or the hidden `SetTimerResolution.exe` boot task, and restart Explorer.
 
 PowerShell helper windows close automatically after successful actions. They stay open only when an error needs to be read.
 
