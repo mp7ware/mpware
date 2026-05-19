@@ -30,7 +30,6 @@ namespace mpwareLauncher
 
         private readonly Dictionary<string, Button> _navButtons = new Dictionary<string, Button>();
         private readonly List<TweakItem> _tweaks = new List<TweakItem>();
-        private readonly HashSet<string> _registryEntryKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly string _scriptPath;
         private readonly string _runtimeRoot;
         private Grid _content;
@@ -104,6 +103,7 @@ namespace mpwareLauncher
             nav.Children.Add(NavButton("Registry Tweaks", ShowRegistryTweaks));
             nav.Children.Add(NavButton("NVIDIA Driver", ShowNvidiaDriver));
             nav.Children.Add(NavButton("Debloater", ShowDebloater));
+            nav.Children.Add(NavButton("Ultimate Cleanup", ShowUltimateCleanup));
             nav.Children.Add(NavButton("Restore Tweaks", ShowRestoreTweaks));
             nav.Children.Add(NavButton("About", ShowAbout));
 
@@ -168,18 +168,18 @@ namespace mpwareLauncher
 
         private void ShowRegistryTweaks()
         {
-            StackPanel page = BeginPage("REGISTRY TWEAKS", "0 tweaks selected - for .REG / .PS1 export or direct apply.", 1040);
+            StackPanel page = BeginPage("REGISTRY TWEAKS", "Select, inspect, export, or apply registry groups.", 1040);
 
             Border promptBox = Box(_borderDim);
-            promptBox.Margin = new Thickness(0, 0, 0, 24);
-            StackPanel promptStack = new StackPanel { Margin = new Thickness(14, 12, 14, 12) };
+            promptBox.Margin = new Thickness(0, 0, 0, 18);
+            StackPanel promptStack = new StackPanel { Margin = new Thickness(14, 10, 14, 10) };
             promptBox.Child = promptStack;
-            promptStack.Children.Add(Text("> mpware.exe is a standalone Windows app - double-click it, UAC prompts for admin, and selected tweaks apply directly.", 11, FontWeights.Bold, _accent));
-            promptStack.Children.Add(Text("  Loaded " + _tweaks.Count + " deduplicated registry groups from the bundled tweak files. Select tweaks first, then apply or export.", 11, FontWeights.Normal, _muted));
+            promptStack.Children.Add(Text("> mpware.exe launches as Administrator and opens a progress log while applying changes.", 11, FontWeights.Bold, _accent));
+            promptStack.Children.Add(Text("  Selected tweaks create a Windows restore point first, then import directly with reg.exe.", 11, FontWeights.Normal, _muted));
             page.Children.Add(promptBox);
 
             Grid actions = new Grid();
-            actions.Margin = new Thickness(0, 0, 0, 24);
+            actions.Margin = new Thickness(0, 0, 0, 18);
             actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             page.Children.Add(actions);
@@ -194,9 +194,6 @@ namespace mpwareLauncher
             buttons.Children.Add(ActionButton("APPLY SELECTED", ApplySelectedTweaks, true));
             buttons.Children.Add(ActionButton("SELECT ALL", delegate { SelectAllTweaks(); }, false));
             buttons.Children.Add(ActionButton("EXPORT .REG", ExportSelectedReg, false));
-            buttons.Children.Add(ActionButton("COPY .PS1", CopySelectedPs1, false));
-            buttons.Children.Add(ActionButton("SAVE .PS1", SaveSelectedPs1, false));
-            buttons.Children.Add(ActionButton("FULL TOOLS", delegate { RunFunction("import-reg"); }, false));
 
             string currentCategory = null;
             foreach (TweakItem tweak in _tweaks)
@@ -229,13 +226,14 @@ namespace mpwareLauncher
             card.Margin = new Thickness(0, 0, 0, 12);
 
             Grid grid = new Grid();
-            grid.Margin = new Thickness(14, 12, 14, 12);
+            grid.Margin = new Thickness(12, 8, 12, 8);
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             card.Child = grid;
 
             CheckBox selector = new CheckBox();
-            selector.Margin = new Thickness(0, 3, 12, 0);
+            selector.Margin = new Thickness(0, 2, 10, 0);
             selector.VerticalAlignment = VerticalAlignment.Top;
             selector.Checked += delegate { UpdateSelectedCount(); };
             selector.Unchecked += delegate { UpdateSelectedCount(); };
@@ -244,25 +242,25 @@ namespace mpwareLauncher
 
             StackPanel body = new StackPanel();
             Grid.SetColumn(body, 1);
+            body.ToolTip = tweak.Description;
             grid.Children.Add(body);
 
             StackPanel titleLine = new StackPanel { Orientation = Orientation.Horizontal };
-            titleLine.Children.Add(Text(tweak.Name, 13, FontWeights.Bold, _text));
+            titleLine.Children.Add(Text(tweak.Name, 12, FontWeights.Bold, _text));
             titleLine.Children.Add(RiskPill(tweak.Risk));
             body.Children.Add(titleLine);
 
-            TextBlock description = Text(tweak.Description, 11, FontWeights.Normal, _text);
-            description.Margin = new Thickness(0, 5, 0, 10);
-            body.Children.Add(description);
-
-            Button path = FlatButton(">  REGISTRY PATH", false);
+            Button path = FlatButton("> REGISTRY PATH", false);
             path.Height = 24;
-            path.MinWidth = 142;
+            path.MinWidth = 136;
             path.Padding = new Thickness(8, 0, 8, 0);
-            path.HorizontalAlignment = HorizontalAlignment.Left;
+            path.Margin = new Thickness(14, 0, 0, 0);
+            path.HorizontalAlignment = HorizontalAlignment.Right;
+            path.VerticalAlignment = VerticalAlignment.Center;
             path.ToolTip = "Click to show full registry paths, values, and descriptions.";
             path.Click += delegate { ShowRegistryPatch(tweak); };
-            body.Children.Add(path);
+            Grid.SetColumn(path, 2);
+            grid.Children.Add(path);
 
             return card;
         }
@@ -388,6 +386,36 @@ namespace mpwareLauncher
             RefreshNav();
         }
 
+        private void ShowUltimateCleanup(object sender, RoutedEventArgs e)
+        {
+            StackPanel page = BeginPage("ULTIMATE CLEANUP", "Bundled cleanup workflow with restore point and progress log.", 760);
+
+            Border warning = Box(_moderate);
+            warning.Margin = new Thickness(0, 0, 0, 22);
+            StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
+            warning.Child = warningStack;
+            warningStack.Children.Add(Text("/!\\ Cleanup can remove logs, caches, temp files, and update leftovers.", 15, FontWeights.Bold, _moderate));
+            warningStack.Children.Add(Text("mpware creates a Windows restore point first, then opens the cleanup tool in a visible progress console.", 11, FontWeights.Bold, _text));
+            page.Children.Add(warning);
+
+            Border box = Box(_border);
+            page.Children.Add(box);
+
+            StackPanel stack = new StackPanel { Margin = new Thickness(24) };
+            box.Child = stack;
+            stack.Children.Add(SectionTitle("ULTIMATE CLEANUP SCRIPT", "Run the bundled cleanup module for temporary files, logs, cache folders, and cleanup targets."));
+            stack.Children.Add(InfoLine("Review the cleanup options in the opened window before running them."));
+            stack.Children.Add(InfoLine("A restart may be useful after deep cleanup or update-cache cleanup."));
+
+            Button run = ActionButton("OPEN ULTIMATE CLEANUP", delegate { RunFunctionWithVisibleConsole("UltimateCleanup", true); }, true);
+            run.Height = 40;
+            run.Margin = new Thickness(0, 24, 0, 0);
+            run.HorizontalAlignment = HorizontalAlignment.Stretch;
+            stack.Children.Add(run);
+
+            RefreshNav();
+        }
+
         private void ShowRestoreTweaks(object sender, RoutedEventArgs e)
         {
             StackPanel page = BeginPage("RESTORE TWEAKS", "Undo and repair helpers live separately from registry patching.", 760);
@@ -407,12 +435,6 @@ namespace mpwareLauncher
             open.HorizontalAlignment = HorizontalAlignment.Stretch;
             stack.Children.Add(open);
 
-            Button full = ActionButton("OPEN FULL TOOLS", delegate { RunFunction("import-reg"); }, false);
-            full.Height = 36;
-            full.Margin = new Thickness(0, 12, 0, 0);
-            full.HorizontalAlignment = HorizontalAlignment.Stretch;
-            stack.Children.Add(full);
-
             RefreshNav();
         }
 
@@ -431,7 +453,7 @@ namespace mpwareLauncher
             copy.Margin = new Thickness(0, 10, 0, 18);
             stack.Children.Add(copy);
 
-            Button run = ActionButton("RUN", delegate { RunFunctionWithVisibleConsole(functionCall); }, true);
+            Button run = ActionButton("RUN", delegate { RunFunctionWithVisibleConsole(functionCall, true); }, true);
             run.HorizontalAlignment = HorizontalAlignment.Stretch;
             stack.Children.Add(run);
         }
@@ -494,8 +516,8 @@ namespace mpwareLauncher
             warnings.Child = warningStack;
             warningStack.Children.Add(Text("/!\\ Critical Warnings", 15, FontWeights.Bold, _danger));
             warningStack.Children.Add(Paragraph("This tool directly modifies the Windows Registry and system configuration. Know what you are doing before applying anything."));
-            warningStack.Children.Add(Bullet("Create a System Restore point before applying any tweaks."));
-            warningStack.Children.Add(Bullet("Run mpware.exe as Administrator - it will auto-prompt UAC on launch actions."));
+            warningStack.Children.Add(Bullet("mpware creates a System Restore point before applying tweaks, debloat presets, or cleanup actions."));
+            warningStack.Children.Add(Bullet("mpware.exe prompts for Administrator on launch."));
             warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability or break software."));
             warningStack.Children.Add(Bullet("Not responsible for any damage or data loss from using these scripts."));
             warningStack.Children.Add(Bullet("Debloat removal is permanent - removed apps must be reinstalled from the Store."));
@@ -510,11 +532,11 @@ namespace mpwareLauncher
             Border how = Box(_border);
             how.Margin = new Thickness(0, 0, 12, 0);
             how.Child = AboutPanel("HOW TO USE MPWARE.EXE", new string[] {
-                "1. Download and run mpware.exe. Keep it in the extracted release folder or use the bundled standalone exe.",
-                "2. Windows may show UAC when you apply tweaks, debloat, or install NVIDIA drivers. Click Yes only when you trust the action.",
-                "3. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED to import them.",
+                "1. Run mpware.exe and approve the Administrator prompt.",
+                "2. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED.",
+                "3. mpware opens a progress log, creates a Windows restore point, imports the selected registry patch, and restarts Explorer.",
                 "4. NVIDIA Driver: press DOWNLOAD AND INSTALL LATEST DRIVER. The PowerShell window stays open if the helper reports an error.",
-                "5. Debloater: start with RECOMMENDED, then restart your PC after registry or app-removal changes."
+                "5. Debloater and Ultimate Cleanup: choose a preset/tool, review the progress log, then restart your PC after deeper changes."
             }, "");
             two.Children.Add(how);
 
@@ -684,12 +706,6 @@ namespace mpwareLauncher
             UpdateSelectedCount();
         }
 
-        private void ApplyAllTweaks(object sender, RoutedEventArgs e)
-        {
-            SelectAllTweaks();
-            ApplyRegistryTweaks(new List<TweakItem>(_tweaks), "all registry tweak groups");
-        }
-
         private void ApplySelectedTweaks(object sender, RoutedEventArgs e)
         {
             List<TweakItem> selected = GetSelectedTweaks();
@@ -709,13 +725,19 @@ namespace mpwareLauncher
             string script =
                 "$ErrorActionPreference='Stop';" +
                 "$reg='" + PsEscape(regPath) + "';" +
-                "Write-Host 'mpware: importing selected registry tweaks...' -ForegroundColor Cyan;" +
+                "$host.UI.RawUI.WindowTitle='mpware progress log';" +
+                "Clear-Host;" +
+                "Write-Host 'mpware: progress log' -ForegroundColor Cyan;" +
+                "Write-Host 'mpware: preparing to apply " + PsEscape(label) + "...' -ForegroundColor Cyan;" +
+                RestorePointScript("registry tweaks") +
+                "Write-Host 'mpware: importing selected registry tweaks with reg.exe...' -ForegroundColor Cyan;" +
                 "& reg.exe import $reg;" +
                 "if ($LASTEXITCODE -ne 0) { throw 'reg.exe import failed with exit code ' + $LASTEXITCODE };" +
-                "try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch {};" +
+                "Write-Host 'mpware: restarting Explorer to refresh visible Windows settings...' -ForegroundColor Cyan;" +
+                "try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch { Write-Host ('mpware: explorer restart skipped: ' + $_.Exception.Message) -ForegroundColor Yellow };" +
                 "Write-Host 'mpware: registry tweaks applied. Restart recommended.' -ForegroundColor Green;" +
-                "Pause";
-            RunElevatedPowerShell(script, "applying " + label);
+                "Write-Host ''; Read-Host 'Press Enter to close'";
+            RunElevatedPowerShellNoExit(script, "applying " + label);
         }
 
         private void ExportSelectedReg(object sender, RoutedEventArgs e)
@@ -731,50 +753,6 @@ namespace mpwareLauncher
             File.WriteAllText(path, BuildRegFile(selected), Encoding.Unicode);
             SetStatus("exported " + path);
             MessageBox.Show("Saved .REG export to Desktop.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void CopySelectedPs1(object sender, RoutedEventArgs e)
-        {
-            List<TweakItem> selected = GetSelectedTweaks();
-            if (selected.Count == 0)
-            {
-                MessageBox.Show("Select at least one registry tweak first.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-            Clipboard.SetText(BuildRegistryScript(selected));
-            SetStatus("copied selected tweak script");
-        }
-
-        private void SaveSelectedPs1(object sender, RoutedEventArgs e)
-        {
-            List<TweakItem> selected = GetSelectedTweaks();
-            if (selected.Count == 0)
-            {
-                MessageBox.Show("Select at least one registry tweak first.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-            string path = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "mpware-selected-tweaks.ps1");
-            File.WriteAllText(path, BuildRegistryScript(selected), Encoding.UTF8);
-            SetStatus("saved " + path);
-            MessageBox.Show("Saved .PS1 export to Desktop.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private string BuildRegistryScript(List<TweakItem> selected)
-        {
-            string regBase64 = Convert.ToBase64String(Encoding.Unicode.GetBytes(BuildRegFile(selected)));
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine("# mpware - selected registry tweaks");
-            sb.AppendLine("# Run as Administrator");
-            sb.AppendLine("$ErrorActionPreference = 'Stop'");
-            sb.AppendLine("$regPath = Join-Path $env:TEMP ('mpware-selected-' + [guid]::NewGuid().ToString('N') + '.reg')");
-            sb.AppendLine("$regBytes = [Convert]::FromBase64String('" + regBase64 + "')");
-            sb.AppendLine("[IO.File]::WriteAllBytes($regPath, $regBytes)");
-            sb.AppendLine("& reg.exe import $regPath");
-            sb.AppendLine("if ($LASTEXITCODE -ne 0) { throw 'reg.exe import failed with exit code ' + $LASTEXITCODE }");
-            sb.AppendLine("try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch {}");
-            sb.AppendLine("Write-Host 'mpware registry tweaks applied. Restart recommended.' -ForegroundColor Cyan");
-            sb.AppendLine("Pause");
-            return sb.ToString();
         }
 
         private string BuildRegFile(List<TweakItem> selected)
@@ -803,21 +781,6 @@ namespace mpwareLauncher
                 }
                 sb.AppendLine("");
             }
-            return sb.ToString();
-        }
-
-        private string BuildNvidiaLauncherScript()
-        {
-            string root = _runtimeRoot ?? "$PSScriptRoot";
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine("# mpware - NVIDIA Driver Setup");
-            sb.AppendLine("# Run as Administrator");
-            sb.AppendLine("$ErrorActionPreference = 'Stop'");
-            sb.AppendLine("$runtime = '" + PsEscape(root) + "'");
-            sb.AppendLine("$script = Join-Path $runtime 'NvidiaAutoinstall.ps1'");
-            sb.AppendLine("if (-not (Test-Path -LiteralPath $script)) { throw 'NVIDIA helper was not found.' }");
-            sb.AppendLine("Write-Host 'Opening mpware NVIDIA driver helper...' -ForegroundColor Cyan");
-            sb.AppendLine("Start-Process powershell.exe -Verb RunAs -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File \"' + $script + '\"')");
             return sb.ToString();
         }
 
@@ -856,43 +819,6 @@ namespace mpwareLauncher
                 "}";
 
             RunElevatedPowerShellNoExit(command, "launching NVIDIA driver helper");
-        }
-
-        private void CopyNvidiaPs1(object sender, RoutedEventArgs e)
-        {
-            Clipboard.SetText(BuildNvidiaLauncherScript());
-            SetStatus("copied nvidia launcher script");
-        }
-
-        private void SaveNvidiaPs1(object sender, RoutedEventArgs e)
-        {
-            string path = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "mpware-nvidia-driver.ps1");
-            File.WriteAllText(path, BuildNvidiaLauncherScript(), Encoding.UTF8);
-            SetStatus("saved " + path);
-            MessageBox.Show("Saved NVIDIA .PS1 launcher to Desktop.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void SaveNvidiaBat(object sender, RoutedEventArgs e)
-        {
-            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            string ps1 = IOPath.Combine(desktop, "mpware-nvidia-driver.ps1");
-            string bat = IOPath.Combine(desktop, "mpware-nvidia-driver.bat");
-            File.WriteAllText(ps1, BuildNvidiaLauncherScript(), Encoding.UTF8);
-            File.WriteAllText(bat, "@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%~dp0mpware-nvidia-driver.ps1\"\r\n", Encoding.ASCII);
-            SetStatus("saved one-click nvidia launcher");
-            MessageBox.Show("Saved NVIDIA .BAT and .PS1 launchers to Desktop.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void RunElevatedPowerShell(string script, string log)
-        {
-            SetStatus(log);
-            string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = "powershell.exe";
-            psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded;
-            psi.UseShellExecute = true;
-            psi.Verb = "runas";
-            Process.Start(psi);
         }
 
         private void RunElevatedPowerShellNoExit(string script, string log)
@@ -938,7 +864,7 @@ namespace mpwareLauncher
             RunElevatedPowerShellNoExit(command, "launching " + relativeScript);
         }
 
-        private void RunFunction(string functionCall)
+        private void RunFunctionWithVisibleConsole(string functionCall, bool createRestorePoint)
         {
             if (!EnsureRuntime())
             {
@@ -949,29 +875,9 @@ namespace mpwareLauncher
             string escapedRoot = PsEscape(_runtimeRoot);
             string command =
                 "$ErrorActionPreference='Continue';" +
-                "Set-Location -LiteralPath '" + escapedRoot + "';" +
-                "$Global:folder='" + escapedRoot + "';" +
-                "$Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
-                "$Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
-                "$Global:iconDir=Join-Path $Global:folder 'mpwareIcons';" +
-                "$Global:customIcon=Join-Path $Global:iconDir 'mp7.ico';" +
-                "Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
-                "Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
-                functionCall;
-            RunElevatedPowerShell(command, "launching " + functionCall);
-        }
-
-        private void RunFunctionWithVisibleConsole(string functionCall)
-        {
-            if (!EnsureRuntime())
-            {
-                return;
-            }
-
-            SetStatus("launching " + functionCall);
-            string escapedRoot = PsEscape(_runtimeRoot);
-            string command =
-                "$ErrorActionPreference='Continue';" +
+                "$host.UI.RawUI.WindowTitle='mpware progress log';" +
+                "Clear-Host;" +
+                "Write-Host 'mpware: progress log' -ForegroundColor Cyan;" +
                 "try {" +
                 "  Set-Location -LiteralPath '" + escapedRoot + "';" +
                 "  $Global:folder='" + escapedRoot + "';" +
@@ -981,6 +887,8 @@ namespace mpwareLauncher
                 "  $Global:customIcon=Join-Path $Global:iconDir 'mp7.ico';" +
                 "  Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
                 "  Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
+                (createRestorePoint ? RestorePointScript(functionCall) : "") +
+                "  Write-Host 'mpware: starting " + PsEscape(functionCall) + "...' -ForegroundColor Cyan;" +
                 "  " + functionCall + ";" +
                 "  Write-Host 'mpware: command finished.' -ForegroundColor Green;" +
                 "} catch {" +
@@ -1110,6 +1018,20 @@ namespace mpwareLauncher
             return (text ?? "").Replace("'", "''");
         }
 
+        private string RestorePointScript(string label)
+        {
+            string safeLabel = PsEscape("mpware - " + label);
+            return
+                "  Write-Host 'mpware: creating Windows restore point...' -ForegroundColor Cyan;" +
+                "  try {" +
+                "    Enable-ComputerRestore -Drive $env:SystemDrive -ErrorAction SilentlyContinue;" +
+                "    Checkpoint-Computer -Description '" + safeLabel + "' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop;" +
+                "    Write-Host 'mpware: restore point created.' -ForegroundColor Green;" +
+                "  } catch {" +
+                "    Write-Host ('mpware: restore point skipped: ' + $_.Exception.Message) -ForegroundColor Yellow;" +
+                "  };";
+        }
+
         private void BuildTweaks()
         {
             LoadBundledRegistryTweaks();
@@ -1235,13 +1157,16 @@ namespace mpwareLauncher
 
         private void AddRegEntry(TweakItem tweak, RegEntry entry)
         {
-            string key = entry.DeleteSection ? "DELETE::" + entry.Section : entry.Section + "::" + entry.ValueName;
-            if (_registryEntryKeys.Contains(key))
+            string key = entry.DeleteSection ? "DELETE::" + entry.Section : entry.Section + "::" + entry.ValueName + "::" + entry.ValueLine;
+            foreach (RegEntry existing in tweak.Entries)
             {
-                return;
+                string existingKey = existing.DeleteSection ? "DELETE::" + existing.Section : existing.Section + "::" + existing.ValueName + "::" + existing.ValueLine;
+                if (String.Equals(existingKey, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
             }
 
-            _registryEntryKeys.Add(key);
             tweak.Entries.Add(entry);
         }
 
