@@ -368,7 +368,7 @@ namespace mpwareLauncher
             StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
             warning.Child = warningStack;
             warningStack.Children.Add(Text("/!\\ Debloat changes are permanent", 15, FontWeights.Bold, _danger));
-            warningStack.Children.Add(Text("Removed Store apps usually need to be reinstalled from Microsoft Store or winget. Create a restore point first.", 11, FontWeights.Bold, _text));
+            warningStack.Children.Add(Text("Removed Store apps usually need to be reinstalled from Microsoft Store or winget. mpware only auto-creates restore points before registry tweak imports.", 11, FontWeights.Bold, _text));
             page.Children.Add(warning);
 
             Grid grid = new Grid();
@@ -388,14 +388,14 @@ namespace mpwareLauncher
 
         private void ShowUltimateCleanup(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("ULTIMATE CLEANUP", "Bundled cleanup workflow with restore point and progress log.", 760);
+            StackPanel page = BeginPage("ULTIMATE CLEANUP", "Bundled cleanup workflow with a visible progress log.", 760);
 
             Border warning = Box(_moderate);
             warning.Margin = new Thickness(0, 0, 0, 22);
             StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
             warning.Child = warningStack;
             warningStack.Children.Add(Text("/!\\ Cleanup can remove logs, caches, temp files, and update leftovers.", 15, FontWeights.Bold, _moderate));
-            warningStack.Children.Add(Text("mpware creates a Windows restore point first, then opens the cleanup tool in a visible progress console.", 11, FontWeights.Bold, _text));
+            warningStack.Children.Add(Text("Cleanup opens in a visible progress console. Create a manual restore point first if you want rollback coverage for cleanup actions.", 11, FontWeights.Bold, _text));
             page.Children.Add(warning);
 
             Border box = Box(_border);
@@ -425,9 +425,9 @@ namespace mpwareLauncher
 
             StackPanel stack = new StackPanel { Margin = new Thickness(24) };
             box.Child = stack;
-            stack.Children.Add(SectionTitle("RESTORE CENTER", "Open the bundled restore tool for registry, app, service, and shell rollback options."));
-            stack.Children.Add(InfoLine("Use this after testing tweaks or before trying a different preset."));
-            stack.Children.Add(InfoLine("Some removals, especially app debloat, may still require reinstalling from Store or winget."));
+            stack.Children.Add(SectionTitle("RESTORE CENTER", "Open the bundled restore tool for the current registry tweak bundle."));
+            stack.Children.Add(InfoLine("This restore window now only exposes registry tweak rollback."));
+            stack.Children.Add(InfoLine("Debloat removals and cleanup actions may still require reinstalling apps or restoring Windows manually."));
 
             Button open = ActionButton("OPEN RESTORE CENTER", delegate { RunScript("Restore.ps1"); }, true);
             open.Height = 40;
@@ -515,12 +515,14 @@ namespace mpwareLauncher
             StackPanel warningStack = new StackPanel { Margin = new Thickness(22) };
             warnings.Child = warningStack;
             warningStack.Children.Add(Text("/!\\ Critical Warnings", 15, FontWeights.Bold, _danger));
-            warningStack.Children.Add(Paragraph("This tool directly modifies the Windows Registry and system configuration. Know what you are doing before applying anything."));
-            warningStack.Children.Add(Bullet("mpware creates a System Restore point before applying tweaks, debloat presets, or cleanup actions."));
+            warningStack.Children.Add(Paragraph("This tool directly modifies the Windows Registry and system configuration. Know what you are applying before you run it."));
+            warningStack.Children.Add(Bullet("mpware creates a System Restore point before Registry Tweaks are applied only."));
             warningStack.Children.Add(Bullet("mpware.exe prompts for Administrator on launch."));
-            warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability or break software."));
+            warningStack.Children.Add(Bullet("PowerShell closes automatically after successful actions and stays open only if an error needs review."));
+            warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability, compatibility issues, or security tradeoffs."));
+            warningStack.Children.Add(Bullet("Ultimate Performance and 0.5ms timer resolution are managed tweaks; they change power/timer behavior beyond simple registry import."));
             warningStack.Children.Add(Bullet("Not responsible for any damage or data loss from using these scripts."));
-            warningStack.Children.Add(Bullet("Debloat removal is permanent - removed apps must be reinstalled from the Store."));
+            warningStack.Children.Add(Bullet("Debloat removal is permanent - removed apps must be reinstalled from the Store or winget."));
             page.Children.Add(warnings);
 
             Grid two = new Grid();
@@ -534,9 +536,9 @@ namespace mpwareLauncher
             how.Child = AboutPanel("HOW TO USE MPWARE.EXE", new string[] {
                 "1. Run mpware.exe and approve the Administrator prompt.",
                 "2. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED.",
-                "3. mpware opens a progress log, creates a Windows restore point, imports the selected registry patch, and restarts Explorer.",
-                "4. NVIDIA Driver: press DOWNLOAD AND INSTALL LATEST DRIVER. The PowerShell window stays open if the helper reports an error.",
-                "5. Debloater and Ultimate Cleanup: choose a preset/tool, review the progress log, then restart your PC after deeper changes."
+                "3. Registry apply opens a progress log, creates a Windows restore point, imports the selected patch, runs needed follow-up actions, and restarts Explorer.",
+                "4. PowerShell closes automatically when an action succeeds. If it fails, the window stays open so you can read the error.",
+                "5. NVIDIA, Debloater, and Ultimate Cleanup are separate tools. They do not auto-create restore points; restart your PC after deeper changes."
             }, "");
             two.Children.Add(how);
 
@@ -581,7 +583,7 @@ namespace mpwareLauncher
             stack.Children.Add(RiskLine("SAFE", _safe, "Well-tested tweaks, no realistic downside. Apply freely."));
             stack.Children.Add(RiskLine("MODERATE", _moderate, "May affect background functionality. Test after applying."));
             stack.Children.Add(RiskLine("ADVANCED", _advanced, "Can cause instability or security implications. Experienced users only."));
-            TextBlock note = Text("Debloat items use PowerShell Remove-AppxPackage - removal is permanent.", 11, FontWeights.Normal, _muted);
+            TextBlock note = Text("Registry tweaks get an automatic restore point. Debloat and cleanup actions do not, and app removal can be permanent.", 11, FontWeights.Normal, _muted);
             note.Margin = new Thickness(0, 18, 0, 0);
             stack.Children.Add(note);
             return stack;
@@ -1343,8 +1345,6 @@ namespace mpwareLauncher
                 return "Sets setup compatibility bypass values for unsupported Windows 11 hardware checks.";
             if (ContainsAny(title, "user account control", "uac"))
                 return "Changes User Account Control policy. This reduces Windows consent prompts and should be treated as advanced.";
-            if (ContainsAny(title, "classic context menu"))
-                return "Restores the older full right-click context menu by adding the Explorer CLSID override.";
             if (ContainsAny(title, "storage sense"))
                 return "Disables the Storage Sense policy so Windows will not automatically clean selected files.";
             if (ContainsAny(title, "dark theme"))
