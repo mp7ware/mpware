@@ -360,11 +360,13 @@ namespace mpwareLauncher
 
         private void ShowAbout(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation and important warnings.", 1100);
+            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation and important warnings.", 1600);
+            page.HorizontalAlignment = HorizontalAlignment.Stretch;
 
             Border banner = Box(_border);
-            banner.Height = 250;
+            banner.Height = 230;
             banner.Margin = new Thickness(0, 0, 0, 28);
+            banner.HorizontalAlignment = HorizontalAlignment.Stretch;
             TextBlock art = Text(
 @"                                                                    (////((/**,*,///
                                                                     /***/#**/**#&**/
@@ -389,9 +391,9 @@ namespace mpwareLauncher
                                                  .                 .#@@@@@@@&*
                                                                    *&@&&%&@&%
                                                                    .@%&&#&%%",
-                9, FontWeights.Bold, _accent);
+                6.7, FontWeights.Bold, _accent);
             art.TextWrapping = TextWrapping.NoWrap;
-            art.LineHeight = 10;
+            art.LineHeight = 8;
             art.Margin = new Thickness(0);
 
             Viewbox artScaler = new Viewbox();
