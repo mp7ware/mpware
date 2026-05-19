@@ -255,7 +255,7 @@ namespace mpwareLauncher
             description.Margin = new Thickness(0, 5, 0, 10);
             body.Children.Add(description);
 
-            Button path = FlatButton(">  REGISTRY PATCH", false);
+            Button path = FlatButton(">  REGISTRY PATH", false);
             path.Height = 24;
             path.MinWidth = 142;
             path.Padding = new Thickness(8, 0, 8, 0);
