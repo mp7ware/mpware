@@ -1,6 +1,6 @@
 # mpware
 
-mpware is a Windows 11 optimization and debloat package with a portable `mpware.exe` launcher.
+mpware is a Windows 11 optimization and debloat package with a portable dashboard-style `mpware.exe` launcher.
 
 The current release package is:
 
@@ -12,6 +12,7 @@ The current release package is:
 ## What Is Included
 
 - Patched portable PowerShell runtime for Windows 11 optimization
+- Native dark dashboard launcher with system cards, category pages, quick actions, and an activity log
 - Registry tweak file, context-menu `.reg` files, restore scripts, driver helpers, cleanup tools, and utilities
 - Generated black/modern icon assets
 
@@ -33,6 +34,12 @@ Refresh the packaged exe and zip:
 
 ```powershell
 .\build\Rebuild-Release.ps1
+```
+
+Smoke-test the embedded runtime:
+
+```powershell
+.\dist\mpware\mpware.exe --self-test
 ```
 
 ## Notices

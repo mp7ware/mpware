@@ -35,6 +35,19 @@ if (-not $csc) {
     throw 'Could not find csc.exe. Install .NET Framework developer tools or run on a standard Windows installation.'
 }
 $cscPath = if ($csc.PSObject.Properties.Name -contains 'Source') { $csc.Source } else { $csc.FullName }
+$frameworkRoot = Split-Path -Parent $cscPath
+$wpfRoot = Join-Path $frameworkRoot 'WPF'
+$wpfRefs = @(
+    (Join-Path $wpfRoot 'PresentationCore.dll'),
+    (Join-Path $wpfRoot 'PresentationFramework.dll'),
+    (Join-Path $wpfRoot 'WindowsBase.dll'),
+    (Join-Path $frameworkRoot 'System.Xaml.dll')
+)
+foreach ($ref in $wpfRefs) {
+    if (-not (Test-Path -LiteralPath $ref)) {
+        throw "Missing build reference: $ref"
+    }
+}
 
 $runtimeZip = Join-Path ([System.IO.Path]::GetTempPath()) "mpware-runtime-$([guid]::NewGuid().ToString('N')).zip"
 try {
@@ -45,10 +58,14 @@ try {
         '/target:winexe',
         "/out:$launcherExe",
         "/resource:$runtimeZip,mpwareRuntimeZip",
-        '/reference:System.Windows.Forms.dll',
         '/reference:System.Drawing.dll',
+        '/reference:System.Management.dll',
         '/reference:System.IO.Compression.dll',
-        '/reference:System.IO.Compression.FileSystem.dll'
+        '/reference:System.IO.Compression.FileSystem.dll',
+        "/reference:$($wpfRefs[0])",
+        "/reference:$($wpfRefs[1])",
+        "/reference:$($wpfRefs[2])",
+        "/reference:$($wpfRefs[3])"
     )
 
     if (Test-Path -LiteralPath $launcherManifest) {
