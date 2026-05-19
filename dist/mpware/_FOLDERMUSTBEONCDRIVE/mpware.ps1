@@ -537,7 +537,7 @@ do {
 
     # Add custom form icon
     # $Global:customIcon = Search-File '*Powershell_black.ico'
-    $Global:customIcon = "$iconDir\Powershell_black.ico"
+    $Global:customIcon = "$iconDir\mp7.ico"
     $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
     # Create the sidebar panel

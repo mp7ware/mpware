@@ -699,7 +699,7 @@ namespace mpwareLauncher
                 "$Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
                 "$Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
                 "$Global:iconDir=Join-Path $Global:folder 'mpwareIcons';" +
-                "$Global:customIcon=Join-Path $Global:iconDir 'Powershell_black.ico';" +
+                "$Global:customIcon=Join-Path $Global:iconDir 'mp7.ico';" +
                 "Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
                 "Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
                 functionCall;
