@@ -360,10 +360,10 @@ namespace mpwareLauncher
 
         private void ShowAbout(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation and important warnings.", 860);
+            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation and important warnings.", 1100);
 
             Border banner = Box(_border);
-            banner.Height = 258;
+            banner.Height = 250;
             banner.Margin = new Thickness(0, 0, 0, 28);
             TextBlock art = Text(
 @"                                                                    (////((/**,*,///
@@ -390,8 +390,22 @@ namespace mpwareLauncher
                                                                    *&@&&%&@&%
                                                                    .@%&&#&%%",
                 9, FontWeights.Bold, _accent);
-            art.Margin = new Thickness(18, 22, 18, 18);
-            banner.Child = art;
+            art.TextWrapping = TextWrapping.NoWrap;
+            art.LineHeight = 10;
+            art.Margin = new Thickness(0);
+
+            Viewbox artScaler = new Viewbox();
+            artScaler.Stretch = Stretch.Uniform;
+            artScaler.StretchDirection = StretchDirection.DownOnly;
+            artScaler.HorizontalAlignment = HorizontalAlignment.Center;
+            artScaler.VerticalAlignment = VerticalAlignment.Center;
+            artScaler.Child = art;
+
+            Grid artFrame = new Grid();
+            artFrame.Margin = new Thickness(14);
+            artFrame.ClipToBounds = true;
+            artFrame.Children.Add(artScaler);
+            banner.Child = artFrame;
             page.Children.Add(banner);
 
             Border warnings = Box(_danger);
