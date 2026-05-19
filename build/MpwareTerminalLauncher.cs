@@ -1,0 +1,1030 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
+using IOPath = System.IO.Path;
+
+namespace mpwareLauncher
+{
+    internal sealed class TerminalDashboardWindow : Window
+    {
+        private readonly Brush _background = BrushFromRgb(0, 0, 0);
+        private readonly Brush _panel = BrushFromRgb(5, 5, 5);
+        private readonly Brush _panelSoft = BrushFromRgb(10, 10, 10);
+        private readonly Brush _border = BrushFromRgb(236, 236, 236);
+        private readonly Brush _borderDim = BrushFromRgb(83, 83, 83);
+        private readonly Brush _text = BrushFromRgb(238, 238, 238);
+        private readonly Brush _muted = BrushFromRgb(166, 166, 166);
+        private readonly Brush _accent = BrushFromRgb(0, 239, 246);
+        private readonly Brush _safe = BrushFromRgb(0, 211, 126);
+        private readonly Brush _moderate = BrushFromRgb(218, 168, 0);
+        private readonly Brush _advanced = BrushFromRgb(238, 112, 0);
+        private readonly Brush _danger = BrushFromRgb(255, 116, 116);
+        private readonly FontFamily _mono = new FontFamily("Consolas");
+
+        private readonly Dictionary<string, Button> _navButtons = new Dictionary<string, Button>();
+        private readonly List<TweakItem> _tweaks = new List<TweakItem>();
+        private readonly string _scriptPath;
+        private readonly string _runtimeRoot;
+        private Grid _content;
+        private TextBlock _selectedCount;
+        private TextBlock _statusLine;
+        private CheckBox _includeDdu;
+        private string _activePage = "Registry Tweaks";
+
+        public TerminalDashboardWindow()
+        {
+            _scriptPath = Program.ResolveScriptPath();
+            _runtimeRoot = String.IsNullOrWhiteSpace(_scriptPath) ? null : IOPath.GetDirectoryName(_scriptPath);
+            BuildTweaks();
+
+            Title = "mpware";
+            Width = 1220;
+            Height = 780;
+            MinWidth = 980;
+            MinHeight = 640;
+            Background = _background;
+            Foreground = _text;
+            FontFamily = _mono;
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            UseLayoutRounding = true;
+            SnapsToDevicePixels = true;
+            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+            TextOptions.SetTextRenderingMode(this, TextRenderingMode.ClearType);
+
+            BuildShell();
+            ShowRegistryTweaks();
+            SetStatus("ready");
+        }
+
+        private void BuildShell()
+        {
+            Grid root = new Grid();
+            root.Background = _background;
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(256) });
+            root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Content = root;
+
+            Border sidebar = new Border();
+            sidebar.Background = _panel;
+            sidebar.BorderBrush = _borderDim;
+            sidebar.BorderThickness = new Thickness(0, 0, 1, 0);
+            Grid.SetColumn(sidebar, 0);
+            root.Children.Add(sidebar);
+
+            DockPanel dock = new DockPanel();
+            sidebar.Child = dock;
+
+            StackPanel brand = new StackPanel { Margin = new Thickness(20, 20, 20, 18) };
+            DockPanel.SetDock(brand, Dock.Top);
+            dock.Children.Add(brand);
+
+            StackPanel logoLine = new StackPanel { Orientation = Orientation.Horizontal };
+            logoLine.Children.Add(Text(">_", 18, FontWeights.Bold, _accent));
+            TextBlock logo = Text(" mpware", 24, FontWeights.Bold, _text);
+            logoLine.Children.Add(logo);
+            brand.Children.Add(logoLine);
+            brand.Children.Add(Text("Performance Toolkit", 12, FontWeights.Normal, _muted));
+
+            StackPanel footer = new StackPanel { Margin = new Thickness(20) };
+            DockPanel.SetDock(footer, Dock.Bottom);
+            footer.Children.Add(Text("v1.0.0 // NO-BS EDITION", 12, FontWeights.Normal, _muted));
+            _statusLine = Text("status: booting", 11, FontWeights.Normal, _muted);
+            _statusLine.Margin = new Thickness(0, 10, 0, 0);
+            footer.Children.Add(_statusLine);
+            dock.Children.Add(footer);
+
+            StackPanel nav = new StackPanel { Margin = new Thickness(16, 8, 16, 0) };
+            dock.Children.Add(nav);
+            nav.Children.Add(NavButton("Registry Tweaks", ShowRegistryTweaks));
+            nav.Children.Add(NavButton("NVIDIA Driver", ShowNvidiaDriver));
+            nav.Children.Add(NavButton("About", ShowAbout));
+
+            _content = new Grid();
+            Grid.SetColumn(_content, 1);
+            root.Children.Add(_content);
+        }
+
+        private Button NavButton(string label, RoutedEventHandler handler)
+        {
+            Button button = FlatButton(">  " + label, false);
+            button.Height = 44;
+            button.Margin = new Thickness(0, 0, 0, 8);
+            button.HorizontalContentAlignment = HorizontalAlignment.Left;
+            button.Padding = new Thickness(14, 0, 14, 0);
+            button.Click += delegate
+            {
+                _activePage = label;
+                RefreshNav();
+                handler(button, new RoutedEventArgs());
+            };
+            _navButtons[label] = button;
+            return button;
+        }
+
+        private void RefreshNav()
+        {
+            foreach (KeyValuePair<string, Button> pair in _navButtons)
+            {
+                bool active = String.Equals(pair.Key, _activePage, StringComparison.OrdinalIgnoreCase);
+                pair.Value.Foreground = active ? _accent : _muted;
+                pair.Value.BorderBrush = active ? _accent : Brushes.Transparent;
+                pair.Value.Background = active ? BrushFromRgb(0, 26, 28) : Brushes.Transparent;
+            }
+        }
+
+        private StackPanel BeginPage(string title, string subtitle, double maxWidth)
+        {
+            _content.Children.Clear();
+            ScrollViewer scroll = new ScrollViewer();
+            scroll.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            scroll.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+            _content.Children.Add(scroll);
+
+            StackPanel page = new StackPanel();
+            page.Margin = new Thickness(28, 24, 28, 32);
+            page.MaxWidth = maxWidth;
+            page.HorizontalAlignment = HorizontalAlignment.Center;
+            scroll.Content = page;
+
+            page.Children.Add(Text(title, 24, FontWeights.Bold, _accent));
+            TextBlock sub = Text(subtitle, 12, FontWeights.Normal, _muted);
+            sub.Margin = new Thickness(0, 8, 0, 24);
+            page.Children.Add(sub);
+            return page;
+        }
+
+        private void ShowRegistryTweaks(object sender, RoutedEventArgs e)
+        {
+            ShowRegistryTweaks();
+        }
+
+        private void ShowRegistryTweaks()
+        {
+            StackPanel page = BeginPage("REGISTRY TWEAKS", "0 tweaks selected - for .REG / .PS1 export or direct apply.", 1040);
+
+            Border promptBox = Box(_borderDim);
+            promptBox.Margin = new Thickness(0, 0, 0, 24);
+            StackPanel promptStack = new StackPanel { Margin = new Thickness(14, 12, 14, 12) };
+            promptBox.Child = promptStack;
+            promptStack.Children.Add(Text("> mpware.exe is a standalone Windows app - double-click it, UAC prompts for admin, and selected tweaks apply directly.", 11, FontWeights.Bold, _accent));
+            promptStack.Children.Add(Text("  .REG and .PS1 exports below are manual-use only. Select tweaks first, then apply or export.", 11, FontWeights.Normal, _muted));
+            page.Children.Add(promptBox);
+
+            Grid actions = new Grid();
+            actions.Margin = new Thickness(0, 0, 0, 24);
+            actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            page.Children.Add(actions);
+
+            _selectedCount = Text("0 tweaks selected", 13, FontWeights.Bold, _text);
+            _selectedCount.VerticalAlignment = VerticalAlignment.Center;
+            actions.Children.Add(_selectedCount);
+
+            StackPanel buttons = new StackPanel { Orientation = Orientation.Horizontal };
+            Grid.SetColumn(buttons, 1);
+            actions.Children.Add(buttons);
+            buttons.Children.Add(ActionButton("APPLY SELECTED", ApplySelectedTweaks, true));
+            buttons.Children.Add(ActionButton("EXPORT .REG", ExportSelectedReg, false));
+            buttons.Children.Add(ActionButton("COPY .PS1", CopySelectedPs1, false));
+            buttons.Children.Add(ActionButton("SAVE .PS1", SaveSelectedPs1, false));
+            buttons.Children.Add(ActionButton("FULL TOOLS", delegate { RunFunction("import-reg"); }, false));
+
+            string currentCategory = null;
+            foreach (TweakItem tweak in _tweaks)
+            {
+                if (!String.Equals(currentCategory, tweak.Category, StringComparison.Ordinal))
+                {
+                    currentCategory = tweak.Category;
+                    page.Children.Add(CategoryHeader(currentCategory));
+                }
+                page.Children.Add(TweakCard(tweak));
+            }
+
+            UpdateSelectedCount();
+            RefreshNav();
+        }
+
+        private UIElement CategoryHeader(string category)
+        {
+            Grid grid = new Grid();
+            grid.Margin = new Thickness(0, 18, 0, 10);
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            TextBlock heading = Text(category, 16, FontWeights.Bold, _accent);
+            grid.Children.Add(heading);
+
+            CheckBox select = new CheckBox();
+            select.Content = "Select All";
+            select.Foreground = _muted;
+            select.FontFamily = _mono;
+            select.FontSize = 11;
+            select.VerticalAlignment = VerticalAlignment.Center;
+            select.Checked += delegate { SetCategory(category, true); };
+            select.Unchecked += delegate { SetCategory(category, false); };
+            Grid.SetColumn(select, 1);
+            grid.Children.Add(select);
+            return grid;
+        }
+
+        private Border TweakCard(TweakItem tweak)
+        {
+            Border card = Box(_border);
+            card.Margin = new Thickness(0, 0, 0, 12);
+
+            Grid grid = new Grid();
+            grid.Margin = new Thickness(14, 12, 14, 12);
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            card.Child = grid;
+
+            CheckBox selector = new CheckBox();
+            selector.Margin = new Thickness(0, 3, 12, 0);
+            selector.VerticalAlignment = VerticalAlignment.Top;
+            selector.Checked += delegate { UpdateSelectedCount(); };
+            selector.Unchecked += delegate { UpdateSelectedCount(); };
+            tweak.Selector = selector;
+            grid.Children.Add(selector);
+
+            StackPanel body = new StackPanel();
+            Grid.SetColumn(body, 1);
+            grid.Children.Add(body);
+
+            StackPanel titleLine = new StackPanel { Orientation = Orientation.Horizontal };
+            titleLine.Children.Add(Text(tweak.Name, 13, FontWeights.Bold, _text));
+            titleLine.Children.Add(RiskPill(tweak.Risk));
+            body.Children.Add(titleLine);
+
+            TextBlock description = Text(tweak.Description, 11, FontWeights.Normal, _text);
+            description.Margin = new Thickness(0, 5, 0, 10);
+            body.Children.Add(description);
+
+            TextBlock path = Text(">  REGISTRY PATH", 10, FontWeights.Normal, _muted);
+            path.ToolTip = RegistryPreview(tweak);
+            body.Children.Add(path);
+
+            return card;
+        }
+
+        private Border RiskPill(string risk)
+        {
+            Brush fill = _safe;
+            if (String.Equals(risk, "Moderate", StringComparison.OrdinalIgnoreCase)) fill = _moderate;
+            if (String.Equals(risk, "Advanced", StringComparison.OrdinalIgnoreCase)) fill = _advanced;
+
+            Border pill = new Border();
+            pill.Background = fill;
+            pill.Margin = new Thickness(10, 0, 0, 0);
+            pill.Padding = new Thickness(6, 2, 6, 2);
+            pill.Child = Text(risk.ToUpperInvariant(), 9, FontWeights.Bold, _background);
+            return pill;
+        }
+
+        private void ShowNvidiaDriver(object sender, RoutedEventArgs e)
+        {
+            StackPanel page = BeginPage("NVIDIA DRIVER TOOL", "Automated script for clean graphics driver installation.", 920);
+
+            Grid columns = new Grid();
+            columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            page.Children.Add(columns);
+
+            Border config = Box(_border);
+            config.Margin = new Thickness(0, 0, 12, 0);
+            Grid.SetColumn(config, 0);
+            columns.Children.Add(config);
+
+            StackPanel configStack = new StackPanel { Margin = new Thickness(22) };
+            config.Child = configStack;
+            configStack.Children.Add(SectionTitle("CONFIGURATION", "Customize your install script"));
+
+            Border dduBox = Box(_border);
+            dduBox.Margin = new Thickness(0, 18, 0, 18);
+            StackPanel dduStack = new StackPanel { Margin = new Thickness(14) };
+            dduBox.Child = dduStack;
+            _includeDdu = new CheckBox();
+            _includeDdu.Content = "Include DDU (Display Driver Uninstaller)";
+            _includeDdu.Foreground = _text;
+            _includeDdu.FontFamily = _mono;
+            _includeDdu.FontWeight = FontWeights.Bold;
+            dduStack.Children.Add(_includeDdu);
+            TextBlock dduHelp = Text("Clean-wipes existing drivers before installing. Recommended when upgrading GPU or fixing stutters.", 11, FontWeights.Normal, _muted);
+            dduHelp.Margin = new Thickness(24, 6, 0, 0);
+            dduStack.Children.Add(dduHelp);
+            configStack.Children.Add(dduBox);
+
+            configStack.Children.Add(Text("INFO", 12, FontWeights.Bold, _muted));
+            configStack.Children.Add(InfoLine("Latest stable: checked by NVIDIA helper"));
+            configStack.Children.Add(InfoLine("Installs via bundled clean-install workflow"));
+            configStack.Children.Add(InfoLine(".BAT auto-elevates - just double-click"));
+
+            Button open = ActionButton("OPEN NVIDIA HELPER", delegate { RunScript("NvidiaAutoinstall.ps1"); }, true);
+            open.Margin = new Thickness(0, 22, 0, 10);
+            configStack.Children.Add(open);
+
+            Grid saveButtons = new Grid();
+            saveButtons.ColumnDefinitions.Add(new ColumnDefinition());
+            saveButtons.ColumnDefinitions.Add(new ColumnDefinition());
+            configStack.Children.Add(saveButtons);
+
+            Button copy = ActionButton("COPY .PS1", CopyNvidiaPs1, false);
+            copy.Margin = new Thickness(0, 0, 6, 0);
+            saveButtons.Children.Add(copy);
+
+            Button save = ActionButton("SAVE .PS1", SaveNvidiaPs1, false);
+            save.Margin = new Thickness(6, 0, 0, 0);
+            Grid.SetColumn(save, 1);
+            saveButtons.Children.Add(save);
+
+            Button bat = ActionButton("SAVE ONE-CLICK .BAT", SaveNvidiaBat, false);
+            bat.Margin = new Thickness(0, 10, 0, 0);
+            configStack.Children.Add(bat);
+
+            Border preview = Box(_border);
+            preview.Margin = new Thickness(12, 0, 0, 0);
+            Grid.SetColumn(preview, 1);
+            columns.Children.Add(preview);
+
+            StackPanel previewStack = new StackPanel { Margin = new Thickness(22) };
+            preview.Child = previewStack;
+            previewStack.Children.Add(SectionTitle("SCRIPT PREVIEW", ""));
+            TextBox box = new TextBox();
+            box.Text = BuildNvidiaLauncherScript();
+            box.Margin = new Thickness(0, 18, 0, 0);
+            box.Height = 320;
+            box.IsReadOnly = true;
+            box.TextWrapping = TextWrapping.Wrap;
+            box.AcceptsReturn = true;
+            box.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            box.Background = _panel;
+            box.Foreground = _muted;
+            box.BorderBrush = _border;
+            box.FontFamily = _mono;
+            box.FontSize = 11;
+            previewStack.Children.Add(box);
+
+            RefreshNav();
+        }
+
+        private void ShowAbout(object sender, RoutedEventArgs e)
+        {
+            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation and important warnings.", 860);
+
+            Border banner = Box(_border);
+            banner.Height = 174;
+            banner.Margin = new Thickness(0, 0, 0, 28);
+            TextBlock art = Text(
+@"        __  __  ____  _       __ ___     ____  ______
+       / / / / / __ \| |     / //   |   / __ \/ ____/
+      / /_/ / / /_/ /| | /| / // /| |  / /_/ / __/
+     / __  / / ____/ | |/ |/ // ___ | / _, _/ /___
+    /_/ /_/ /_/      |__/|__//_/  |_|/_/ |_/_____/
+
+        clean windows tuning // registry // drivers // restore",
+                13, FontWeights.Bold, _accent);
+            art.Margin = new Thickness(18, 22, 18, 18);
+            banner.Child = art;
+            page.Children.Add(banner);
+
+            Border warnings = Box(_danger);
+            warnings.Margin = new Thickness(0, 0, 0, 26);
+            StackPanel warningStack = new StackPanel { Margin = new Thickness(22) };
+            warnings.Child = warningStack;
+            warningStack.Children.Add(Text("/!\\ Critical Warnings", 15, FontWeights.Bold, _danger));
+            warningStack.Children.Add(Paragraph("This tool directly modifies the Windows Registry and system configuration. Know what you are doing before applying anything."));
+            warningStack.Children.Add(Bullet("Create a System Restore point before applying any tweaks."));
+            warningStack.Children.Add(Bullet("Run mpware.exe as Administrator - it will auto-prompt UAC on launch actions."));
+            warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability or break software."));
+            warningStack.Children.Add(Bullet("Not responsible for any damage or data loss from using these scripts."));
+            warningStack.Children.Add(Bullet("Debloat removal is permanent - removed apps must be reinstalled from the Store."));
+            page.Children.Add(warnings);
+
+            Grid two = new Grid();
+            two.ColumnDefinitions.Add(new ColumnDefinition());
+            two.ColumnDefinitions.Add(new ColumnDefinition());
+            two.Margin = new Thickness(0, 0, 0, 28);
+            page.Children.Add(two);
+
+            Border how = Box(_border);
+            how.Margin = new Thickness(0, 0, 12, 0);
+            how.Child = AboutPanel("HOW TO USE MPWARE.EXE", new string[] {
+                "1. Download mpware.exe from the Registry Tweaks page.",
+                "2. Double-click it. Windows prompts UAC - click Yes to allow admin.",
+                "3. A terminal UI opens. Navigate categories with mouse or keyboard.",
+                "4. Select tweaks and press APPLY SELECTED to write registry keys.",
+                "5. Restart your PC when done."
+            }, "Keys:  Tab move   Space select   Enter activate");
+            two.Children.Add(how);
+
+            Border risk = Box(_border);
+            risk.Margin = new Thickness(12, 0, 0, 0);
+            risk.Child = RiskPanel();
+            Grid.SetColumn(risk, 1);
+            two.Children.Add(risk);
+
+            Border included = Box(_border);
+            included.Child = IncludedPanel();
+            page.Children.Add(included);
+
+            RefreshNav();
+        }
+
+        private StackPanel AboutPanel(string title, string[] lines, string footer)
+        {
+            StackPanel stack = new StackPanel { Margin = new Thickness(22) };
+            stack.Children.Add(Text(">  " + title, 15, FontWeights.Bold, _accent));
+            for (int i = 0; i < lines.Length; i++)
+            {
+                TextBlock line = Text(lines[i], 11, FontWeights.Normal, _text);
+                line.Margin = new Thickness(0, i == 0 ? 20 : 8, 0, 0);
+                stack.Children.Add(line);
+            }
+            Border keys = Box(_borderDim);
+            keys.Margin = new Thickness(0, 18, 0, 0);
+            keys.Child = Text(footer, 11, FontWeights.Bold, _accent);
+            keys.Padding = new Thickness(8);
+            stack.Children.Add(keys);
+            return stack;
+        }
+
+        private StackPanel RiskPanel()
+        {
+            StackPanel stack = new StackPanel { Margin = new Thickness(22) };
+            stack.Children.Add(Text("[] RISK LEVELS", 15, FontWeights.Bold, _accent));
+            stack.Children.Add(RiskLine("SAFE", _safe, "Well-tested tweaks, no realistic downside. Apply freely."));
+            stack.Children.Add(RiskLine("MODERATE", _moderate, "May affect background functionality. Test after applying."));
+            stack.Children.Add(RiskLine("ADVANCED", _advanced, "Can cause instability or security implications. Experienced users only."));
+            TextBlock note = Text("Debloat items use PowerShell Remove-AppxPackage - removal is permanent.", 11, FontWeights.Normal, _muted);
+            note.Margin = new Thickness(0, 18, 0, 0);
+            stack.Children.Add(note);
+            return stack;
+        }
+
+        private StackPanel IncludedPanel()
+        {
+            StackPanel outer = new StackPanel { Margin = new Thickness(22) };
+            outer.Children.Add(Text("() WHAT'S INCLUDED", 15, FontWeights.Bold, _accent));
+            Grid grid = new Grid();
+            grid.Margin = new Thickness(0, 22, 0, 0);
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            outer.Children.Add(grid);
+
+            AddIncludedColumn(grid, 0, "GAMING", new string[] { "Disable Game DVR", "Enable HAGS", "Disable Mouse Accel", "Disable FSO", "Boost Foreground Priority", "System Profile for Games" });
+            AddIncludedColumn(grid, 1, "NETWORK", new string[] { "Disable Net Throttling", "Disable Nagle", "QoS reservation", "MMCSS responsiveness", "Power throttling" });
+            AddIncludedColumn(grid, 2, "CPU & POWER", new string[] { "High Performance Plan", "Timer Resolution", "Core Parking hooks", "Spectre mitigation toggle", "Kernel RAM preference" });
+            return outer;
+        }
+
+        private void AddIncludedColumn(Grid grid, int column, string title, string[] lines)
+        {
+            StackPanel stack = new StackPanel();
+            stack.Margin = new Thickness(column == 0 ? 0 : 22, 0, 0, 0);
+            Grid.SetColumn(stack, column);
+            grid.Children.Add(stack);
+            stack.Children.Add(Text(title, 12, FontWeights.Bold, _accent));
+            foreach (string line in lines)
+            {
+                stack.Children.Add(Text("> " + line, 11, FontWeights.Normal, _muted));
+            }
+        }
+
+        private TextBlock RiskLine(string label, Brush brush, string copy)
+        {
+            TextBlock line = Text(label + "   " + copy, 11, FontWeights.Normal, _text);
+            line.Margin = new Thickness(0, 18, 0, 0);
+            line.Foreground = _text;
+            line.TextDecorations = null;
+            return line;
+        }
+
+        private TextBlock InfoLine(string text)
+        {
+            TextBlock line = Text("(i) " + text, 11, FontWeights.Bold, _text);
+            line.Margin = new Thickness(0, 10, 0, 0);
+            return line;
+        }
+
+        private StackPanel SectionTitle(string title, string subtitle)
+        {
+            StackPanel stack = new StackPanel();
+            stack.Children.Add(Text("[ ] " + title, 15, FontWeights.Bold, _accent));
+            if (!String.IsNullOrWhiteSpace(subtitle))
+            {
+                TextBlock sub = Text(subtitle, 11, FontWeights.Normal, _muted);
+                sub.Margin = new Thickness(0, 8, 0, 0);
+                stack.Children.Add(sub);
+            }
+            return stack;
+        }
+
+        private TextBlock Paragraph(string text)
+        {
+            TextBlock block = Text(text, 11, FontWeights.Bold, _text);
+            block.Margin = new Thickness(0, 22, 0, 8);
+            return block;
+        }
+
+        private TextBlock Bullet(string text)
+        {
+            TextBlock block = Text("-  " + text, 11, FontWeights.Bold, _text);
+            block.Margin = new Thickness(0, 8, 0, 0);
+            return block;
+        }
+
+        private void SetCategory(string category, bool selected)
+        {
+            foreach (TweakItem tweak in _tweaks)
+            {
+                if (String.Equals(tweak.Category, category, StringComparison.Ordinal) && tweak.Selector != null)
+                {
+                    tweak.Selector.IsChecked = selected;
+                }
+            }
+            UpdateSelectedCount();
+        }
+
+        private void UpdateSelectedCount()
+        {
+            int count = GetSelectedTweaks().Count;
+            if (_selectedCount != null)
+            {
+                _selectedCount.Text = count + " tweak" + (count == 1 ? "" : "s") + " selected";
+            }
+        }
+
+        private List<TweakItem> GetSelectedTweaks()
+        {
+            List<TweakItem> selected = new List<TweakItem>();
+            foreach (TweakItem tweak in _tweaks)
+            {
+                if (tweak.Selector != null && tweak.Selector.IsChecked == true)
+                {
+                    selected.Add(tweak);
+                }
+            }
+            return selected;
+        }
+
+        private void ApplySelectedTweaks(object sender, RoutedEventArgs e)
+        {
+            List<TweakItem> selected = GetSelectedTweaks();
+            if (selected.Count == 0)
+            {
+                MessageBox.Show("Select at least one registry tweak first.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string script = BuildRegistryScript(selected);
+            RunElevatedPowerShell(script, "Applying selected registry tweaks");
+        }
+
+        private void ExportSelectedReg(object sender, RoutedEventArgs e)
+        {
+            List<TweakItem> selected = GetSelectedTweaks();
+            if (selected.Count == 0)
+            {
+                MessageBox.Show("Select at least one registry tweak first.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string path = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "mpware-selected-tweaks.reg");
+            File.WriteAllText(path, BuildRegFile(selected), Encoding.Unicode);
+            SetStatus("exported " + path);
+            MessageBox.Show("Saved .REG export to Desktop.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void CopySelectedPs1(object sender, RoutedEventArgs e)
+        {
+            List<TweakItem> selected = GetSelectedTweaks();
+            if (selected.Count == 0)
+            {
+                MessageBox.Show("Select at least one registry tweak first.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            Clipboard.SetText(BuildRegistryScript(selected));
+            SetStatus("copied selected tweak script");
+        }
+
+        private void SaveSelectedPs1(object sender, RoutedEventArgs e)
+        {
+            List<TweakItem> selected = GetSelectedTweaks();
+            if (selected.Count == 0)
+            {
+                MessageBox.Show("Select at least one registry tweak first.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            string path = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "mpware-selected-tweaks.ps1");
+            File.WriteAllText(path, BuildRegistryScript(selected), Encoding.UTF8);
+            SetStatus("saved " + path);
+            MessageBox.Show("Saved .PS1 export to Desktop.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private string BuildRegistryScript(List<TweakItem> selected)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("# mpware - selected registry tweaks");
+            sb.AppendLine("# Run as Administrator");
+            sb.AppendLine("$ErrorActionPreference = 'Stop'");
+            sb.AppendLine("function Convert-MpwareRegistryPath {");
+            sb.AppendLine("    param([string]$Path)");
+            sb.AppendLine("    if ($Path.StartsWith('HKCU\\')) { return 'Registry::HKEY_CURRENT_USER\\' + $Path.Substring(5) }");
+            sb.AppendLine("    if ($Path.StartsWith('HKLM\\')) { return 'Registry::HKEY_LOCAL_MACHINE\\' + $Path.Substring(5) }");
+            sb.AppendLine("    return 'Registry::' + $Path");
+            sb.AppendLine("}");
+            sb.AppendLine("function Set-MpwareRegistryValue {");
+            sb.AppendLine("    param([string]$Path,[string]$Name,[string]$Type,[string]$Value)");
+            sb.AppendLine("    $targets = @()");
+            sb.AppendLine("    if ($Path.EndsWith('\\*')) {");
+            sb.AppendLine("        $basePath = Convert-MpwareRegistryPath $Path.Substring(0, $Path.Length - 2)");
+            sb.AppendLine("        if (Test-Path -LiteralPath $basePath) { $targets = Get-ChildItem -LiteralPath $basePath | Select-Object -ExpandProperty PSPath }");
+            sb.AppendLine("    } else {");
+            sb.AppendLine("        $targets = @(Convert-MpwareRegistryPath $Path)");
+            sb.AppendLine("    }");
+            sb.AppendLine("    foreach ($target in $targets) {");
+            sb.AppendLine("        if (-not (Test-Path -LiteralPath $target)) { New-Item -Path $target -Force | Out-Null }");
+            sb.AppendLine("        if ($Type -eq 'DWORD') { New-ItemProperty -Path $target -Name $Name -PropertyType DWord -Value ([uint32]$Value) -Force | Out-Null }");
+            sb.AppendLine("        else { New-ItemProperty -Path $target -Name $Name -PropertyType String -Value $Value -Force | Out-Null }");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+            foreach (TweakItem tweak in selected)
+            {
+                sb.AppendLine("");
+                sb.AppendLine("# " + tweak.Name);
+                foreach (TweakValue value in tweak.Values)
+                {
+                    sb.Append("Set-MpwareRegistryValue -Path '").Append(PsEscape(value.Path)).Append("' -Name '").Append(PsEscape(value.Key)).Append("' -Type '").Append(PsEscape(value.Type)).Append("' -Value '").Append(PsEscape(value.Value)).AppendLine("'");
+                }
+            }
+            sb.AppendLine("");
+            sb.AppendLine("Write-Host 'mpware registry tweaks applied. Restart recommended.' -ForegroundColor Cyan");
+            sb.AppendLine("Pause");
+            return sb.ToString();
+        }
+
+        private string BuildRegFile(List<TweakItem> selected)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("Windows Registry Editor Version 5.00");
+            foreach (TweakItem tweak in selected)
+            {
+                sb.AppendLine("");
+                sb.AppendLine("; " + tweak.Name);
+                foreach (TweakValue value in tweak.Values)
+                {
+                    if (value.Path.EndsWith("\\*", StringComparison.Ordinal))
+                    {
+                        sb.AppendLine("; Skipped wildcard path for " + value.Key + ": export this tweak as .PS1");
+                        continue;
+                    }
+                    sb.AppendLine("[" + RegHivePath(value.Path) + "]");
+                    if (String.Equals(value.Type, "DWORD", StringComparison.OrdinalIgnoreCase))
+                    {
+                        uint number;
+                        UInt32.TryParse(value.Value, out number);
+                        sb.AppendLine("\"" + value.Key + "\"=dword:" + number.ToString("x8"));
+                    }
+                    else
+                    {
+                        sb.AppendLine("\"" + value.Key + "\"=\"" + value.Value.Replace("\"", "\\\"") + "\"");
+                    }
+                    sb.AppendLine("");
+                }
+            }
+            return sb.ToString();
+        }
+
+        private string BuildNvidiaLauncherScript()
+        {
+            string root = _runtimeRoot ?? "$PSScriptRoot";
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("# mpware - NVIDIA Driver Setup");
+            sb.AppendLine("# Run as Administrator");
+            sb.AppendLine("$ErrorActionPreference = 'Stop'");
+            sb.AppendLine("$runtime = '" + PsEscape(root) + "'");
+            sb.AppendLine("$script = Join-Path $runtime 'NvidiaAutoinstall.ps1'");
+            sb.AppendLine("if (-not (Test-Path -LiteralPath $script)) { throw 'NVIDIA helper was not found.' }");
+            sb.AppendLine("Write-Host 'Opening mpware NVIDIA driver helper...' -ForegroundColor Cyan");
+            if (_includeDdu != null && _includeDdu.IsChecked == true)
+            {
+                sb.AppendLine("Write-Host 'DDU selected: use the clean install prompts inside the helper.' -ForegroundColor Cyan");
+            }
+            sb.AppendLine("Start-Process powershell.exe -Verb RunAs -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File \"' + $script + '\"')");
+            return sb.ToString();
+        }
+
+        private void CopyNvidiaPs1(object sender, RoutedEventArgs e)
+        {
+            Clipboard.SetText(BuildNvidiaLauncherScript());
+            SetStatus("copied nvidia launcher script");
+        }
+
+        private void SaveNvidiaPs1(object sender, RoutedEventArgs e)
+        {
+            string path = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "mpware-nvidia-driver.ps1");
+            File.WriteAllText(path, BuildNvidiaLauncherScript(), Encoding.UTF8);
+            SetStatus("saved " + path);
+            MessageBox.Show("Saved NVIDIA .PS1 launcher to Desktop.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void SaveNvidiaBat(object sender, RoutedEventArgs e)
+        {
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            string ps1 = IOPath.Combine(desktop, "mpware-nvidia-driver.ps1");
+            string bat = IOPath.Combine(desktop, "mpware-nvidia-driver.bat");
+            File.WriteAllText(ps1, BuildNvidiaLauncherScript(), Encoding.UTF8);
+            File.WriteAllText(bat, "@echo off\r\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%~dp0mpware-nvidia-driver.ps1\"\r\n", Encoding.ASCII);
+            SetStatus("saved one-click nvidia launcher");
+            MessageBox.Show("Saved NVIDIA .BAT and .PS1 launchers to Desktop.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void RunElevatedPowerShell(string script, string log)
+        {
+            SetStatus(log);
+            string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "powershell.exe";
+            psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded;
+            psi.UseShellExecute = true;
+            psi.Verb = "runas";
+            Process.Start(psi);
+        }
+
+        private void RunScript(string relativeScript)
+        {
+            if (!EnsureRuntime())
+            {
+                return;
+            }
+
+            string script = IOPath.Combine(_runtimeRoot, relativeScript);
+            if (!File.Exists(script))
+            {
+                MessageBox.Show("Missing runtime script: " + relativeScript, "mpware", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            SetStatus("launching " + relativeScript);
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "powershell.exe";
+            psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\"";
+            psi.WorkingDirectory = _runtimeRoot;
+            psi.UseShellExecute = true;
+            psi.Verb = "runas";
+            Process.Start(psi);
+        }
+
+        private void RunFunction(string functionCall)
+        {
+            if (!EnsureRuntime())
+            {
+                return;
+            }
+
+            SetStatus("launching " + functionCall);
+            string escapedRoot = PsEscape(_runtimeRoot);
+            string command =
+                "$ErrorActionPreference='Continue';" +
+                "Set-Location -LiteralPath '" + escapedRoot + "';" +
+                "$Global:folder='" + escapedRoot + "';" +
+                "$Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
+                "$Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
+                "$Global:iconDir=Join-Path $Global:folder 'mpwareIcons';" +
+                "$Global:customIcon=Join-Path $Global:iconDir 'Powershell_black.ico';" +
+                "Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
+                "Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
+                functionCall;
+            RunElevatedPowerShell(command, "launching " + functionCall);
+        }
+
+        private bool EnsureRuntime()
+        {
+            if (!String.IsNullOrWhiteSpace(_scriptPath) && File.Exists(_scriptPath) && Directory.Exists(_runtimeRoot))
+            {
+                return true;
+            }
+            MessageBox.Show("mpware runtime was not found. Rebuild mpware.exe or extract the release zip.", "mpware", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
+
+        private void SetStatus(string message)
+        {
+            if (_statusLine != null)
+            {
+                _statusLine.Text = "status: " + DateTime.Now.ToString("HH:mm:ss") + " " + message;
+            }
+        }
+
+        private Button ActionButton(string text, RoutedEventHandler handler, bool primary)
+        {
+            Button button = FlatButton(text, primary);
+            button.Height = 34;
+            button.Margin = new Thickness(8, 0, 0, 0);
+            button.Click += handler;
+            return button;
+        }
+
+        private Button FlatButton(string text, bool primary)
+        {
+            Button button = new Button();
+            button.Content = text;
+            button.Background = primary ? _accent : _background;
+            button.Foreground = primary ? _background : _text;
+            button.BorderBrush = primary ? _accent : _border;
+            button.BorderThickness = new Thickness(1);
+            button.FontFamily = _mono;
+            button.FontSize = 12;
+            button.FontWeight = FontWeights.Bold;
+            button.Padding = new Thickness(16, 0, 16, 0);
+            button.HorizontalContentAlignment = HorizontalAlignment.Center;
+            button.VerticalContentAlignment = VerticalAlignment.Center;
+            button.Cursor = Cursors.Hand;
+            button.Template = ButtonTemplate();
+            return button;
+        }
+
+        private ControlTemplate ButtonTemplate()
+        {
+            ControlTemplate template = new ControlTemplate(typeof(Button));
+            FrameworkElementFactory border = new FrameworkElementFactory(typeof(Border));
+            border.SetValue(Border.SnapsToDevicePixelsProperty, true);
+            border.SetBinding(Border.BackgroundProperty, new Binding("Background") { RelativeSource = RelativeSource.TemplatedParent });
+            border.SetBinding(Border.BorderBrushProperty, new Binding("BorderBrush") { RelativeSource = RelativeSource.TemplatedParent });
+            border.SetBinding(Border.BorderThicknessProperty, new Binding("BorderThickness") { RelativeSource = RelativeSource.TemplatedParent });
+
+            FrameworkElementFactory presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+            presenter.SetBinding(ContentPresenter.HorizontalAlignmentProperty, new Binding("HorizontalContentAlignment") { RelativeSource = RelativeSource.TemplatedParent });
+            presenter.SetBinding(ContentPresenter.VerticalAlignmentProperty, new Binding("VerticalContentAlignment") { RelativeSource = RelativeSource.TemplatedParent });
+            presenter.SetBinding(ContentPresenter.MarginProperty, new Binding("Padding") { RelativeSource = RelativeSource.TemplatedParent });
+            presenter.SetValue(ContentPresenter.SnapsToDevicePixelsProperty, true);
+
+            border.AppendChild(presenter);
+            template.VisualTree = border;
+            return template;
+        }
+
+        private Border Box(Brush borderBrush)
+        {
+            Border box = new Border();
+            box.Background = _panel;
+            box.BorderBrush = borderBrush;
+            box.BorderThickness = new Thickness(1);
+            box.SnapsToDevicePixels = true;
+            return box;
+        }
+
+        private TextBlock Text(string value, double size, FontWeight weight, Brush brush)
+        {
+            TextBlock block = new TextBlock();
+            block.Text = value;
+            block.FontFamily = _mono;
+            block.FontSize = size;
+            block.FontWeight = weight;
+            block.Foreground = brush;
+            block.TextWrapping = TextWrapping.Wrap;
+            block.LineHeight = size + 6;
+            return block;
+        }
+
+        private string RegistryPreview(TweakItem tweak)
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (TweakValue value in tweak.Values)
+            {
+                sb.AppendLine(value.Path + " :: " + value.Key + " = " + value.Value + " (" + value.Type + ")");
+            }
+            return sb.ToString();
+        }
+
+        private string RegHivePath(string path)
+        {
+            if (path.StartsWith("HKCU\\", StringComparison.OrdinalIgnoreCase)) return "HKEY_CURRENT_USER\\" + path.Substring(5);
+            if (path.StartsWith("HKLM\\", StringComparison.OrdinalIgnoreCase)) return "HKEY_LOCAL_MACHINE\\" + path.Substring(5);
+            return path;
+        }
+
+        private string PsEscape(string text)
+        {
+            return (text ?? "").Replace("'", "''");
+        }
+
+        private void BuildTweaks()
+        {
+            AddTweak("GAMING PERFORMANCE", "Safe", "Disable Game DVR & Game Bar", "Kills Xbox Game Bar recording overhead. GameDVR_Enabled=0, AppCaptureEnabled=0.",
+                Val("HKCU\\System\\GameConfigStore", "GameDVR_Enabled", "DWORD", "0"),
+                Val("HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\GameDVR", "AppCaptureEnabled", "DWORD", "0"));
+            AddTweak("GAMING PERFORMANCE", "Moderate", "Enable Hardware-Accelerated GPU Scheduling", "HwSchMode=2. Offloads GPU memory management to a dedicated hardware scheduler.",
+                Val("HKLM\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers", "HwSchMode", "DWORD", "2"));
+            AddTweak("GAMING PERFORMANCE", "Safe", "Disable Mouse Acceleration", "MouseSpeed=0, Threshold1=0, Threshold2=0. Disables Enhanced Pointer Precision.",
+                Val("HKCU\\Control Panel\\Mouse", "MouseSpeed", "String", "0"),
+                Val("HKCU\\Control Panel\\Mouse", "MouseThreshold1", "String", "0"),
+                Val("HKCU\\Control Panel\\Mouse", "MouseThreshold2", "String", "0"));
+            AddTweak("GAMING PERFORMANCE", "Safe", "Disable Fullscreen Optimizations", "Prevents DWM from hijacking exclusive fullscreen in games.",
+                Val("HKCU\\System\\GameConfigStore", "GameDVR_FSEBehaviorMode", "DWORD", "2"),
+                Val("HKCU\\System\\GameConfigStore", "GameDVR_HonorUserFSEBehaviorMode", "DWORD", "1"));
+            AddTweak("GAMING PERFORMANCE", "Moderate", "Foreground App CPU Priority", "Win32PrioritySeparation=0x26. Maximum CPU time-slice weighting for the foreground app.",
+                Val("HKLM\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl", "Win32PrioritySeparation", "DWORD", "38"));
+            AddTweak("GAMING PERFORMANCE", "Moderate", "MMCSS GPU & Game Priority", "Sets Games task priority high for MMCSS scheduling.",
+                Val("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "GPU Priority", "DWORD", "8"),
+                Val("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "Priority", "DWORD", "6"),
+                Val("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "Scheduling Category", "String", "High"),
+                Val("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile\\Tasks\\Games", "SFIO Priority", "String", "High"));
+            AddTweak("GAMING PERFORMANCE", "Safe", "Disable MMCSS Network & DWM Throttle", "Stops multimedia and game threads from reserving CPU for background work.",
+                Val("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile", "SystemResponsiveness", "DWORD", "0"));
+            AddTweak("GAMING PERFORMANCE", "Moderate", "Disable Power Throttling", "Prevents Windows from silently reducing CPU clocks on background processes.",
+                Val("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Power\\PowerThrottling", "PowerThrottlingOff", "DWORD", "1"));
+            AddTweak("GAMING PERFORMANCE", "Moderate", "Global Timer Resolution (0.5ms)", "Allows processes to request 0.5ms timer resolution globally.",
+                Val("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel", "GlobalTimerResolutionRequests", "DWORD", "1"));
+            AddTweak("GAMING PERFORMANCE", "Advanced", "Disable Spectre/Meltdown Mitigations", "Can recover CPU performance on isolated gaming PCs, but reduces exploit mitigations.",
+                Val("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management", "FeatureSettingsOverride", "DWORD", "3"),
+                Val("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management", "FeatureSettingsOverrideMask", "DWORD", "3"));
+
+            AddTweak("NETWORK & LATENCY", "Safe", "Disable Nagle's Algorithm", "Sends TCP packets immediately instead of buffering. Applies to all TCP/IP interfaces.",
+                Val("HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\*", "TcpAckFrequency", "DWORD", "1"),
+                Val("HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\*", "TCPNoDelay", "DWORD", "1"),
+                Val("HKLM\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\*", "TcpDelAckTicks", "DWORD", "0"));
+            AddTweak("NETWORK & LATENCY", "Moderate", "Disable Network Throttling Index", "Removes multimedia bandwidth throttling for non-MMCSS processes.",
+                Val("HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Multimedia\\SystemProfile", "NetworkThrottlingIndex", "DWORD", "4294967295"));
+            AddTweak("NETWORK & LATENCY", "Safe", "Disable QoS Bandwidth Reservation", "NonBestEffortLimit=0. Removes policy bandwidth reservation.",
+                Val("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Psched", "NonBestEffortLimit", "DWORD", "0"));
+
+            AddTweak("PRIVACY & TELEMETRY", "Safe", "Disable Windows Telemetry", "AllowTelemetry=0 in policy and software hives.",
+                Val("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection", "AllowTelemetry", "DWORD", "0"),
+                Val("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\DataCollection", "AllowTelemetry", "DWORD", "0"));
+            AddTweak("PRIVACY & TELEMETRY", "Safe", "Disable Cortana & Bing Search", "Kills Cortana and web search integration from the search bar.",
+                Val("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search", "AllowCortana", "DWORD", "0"),
+                Val("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search", "DisableWebSearch", "DWORD", "1"));
+            AddTweak("PRIVACY & TELEMETRY", "Safe", "Disable Activity History", "Stops Windows from logging and uploading app/file activity.",
+                Val("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\System", "PublishUserActivities", "DWORD", "0"),
+                Val("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\System", "UploadUserActivities", "DWORD", "0"));
+            AddTweak("PRIVACY & TELEMETRY", "Safe", "Disable Advertising ID", "Prevents apps from using the Windows advertising identifier.",
+                Val("HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo", "Enabled", "DWORD", "0"));
+            AddTweak("PRIVACY & TELEMETRY", "Safe", "Disable Location Consent", "Sets the Windows location capability consent store to Deny.",
+                Val("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\location", "Value", "String", "Deny"));
+
+            AddTweak("VISUAL", "Safe", "Disable Animations", "Uses best-performance visual effect settings and disables minimize animation.",
+                Val("HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects", "VisualFXSetting", "DWORD", "2"),
+                Val("HKCU\\Control Panel\\Desktop\\WindowMetrics", "MinAnimate", "String", "0"));
+            AddTweak("VISUAL", "Safe", "Disable Transparency", "Turns off acrylic/transparency effects for a cleaner desktop.",
+                Val("HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "EnableTransparency", "DWORD", "0"));
+            AddTweak("VISUAL", "Safe", "Remove Taskbar Search", "Hides the search box from the Windows taskbar.",
+                Val("HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Search", "SearchboxTaskbarMode", "DWORD", "0"));
+            AddTweak("VISUAL", "Safe", "Remove Snap Assist Flyout", "Disables the snap layout flyout on maximize hover.",
+                Val("HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "EnableSnapAssistFlyout", "DWORD", "0"));
+        }
+
+        private void AddTweak(string category, string risk, string name, string description, params TweakValue[] values)
+        {
+            TweakItem item = new TweakItem();
+            item.Category = category;
+            item.Risk = risk;
+            item.Name = name;
+            item.Description = description;
+            item.Values = new List<TweakValue>(values);
+            _tweaks.Add(item);
+        }
+
+        private TweakValue Val(string path, string key, string type, string value)
+        {
+            TweakValue tweakValue = new TweakValue();
+            tweakValue.Path = path;
+            tweakValue.Key = key;
+            tweakValue.Type = type;
+            tweakValue.Value = value;
+            return tweakValue;
+        }
+
+        private static SolidColorBrush BrushFromRgb(byte r, byte g, byte b)
+        {
+            SolidColorBrush brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+            brush.Freeze();
+            return brush;
+        }
+
+        private sealed class TweakItem
+        {
+            public string Category;
+            public string Risk;
+            public string Name;
+            public string Description;
+            public List<TweakValue> Values;
+            public CheckBox Selector;
+        }
+
+        private sealed class TweakValue
+        {
+            public string Path;
+            public string Key;
+            public string Type;
+            public string Value;
+        }
+    }
+}

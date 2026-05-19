@@ -34,7 +34,7 @@ namespace mpwareLauncher
 
                 Application app = new Application();
                 app.ShutdownMode = ShutdownMode.OnMainWindowClose;
-                return app.Run(new DashboardWindow());
+                return app.Run(new TerminalDashboardWindow());
             }
             catch (Exception ex)
             {
