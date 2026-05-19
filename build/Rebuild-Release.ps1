@@ -15,6 +15,7 @@ $launcherExe = Join-Path $PackageRoot 'mpware.exe'
 $zipPath = Join-Path $root 'dist\mpware.zip'
 $runtimeRoot = Join-Path $PackageRoot '_FOLDERMUSTBEONCDRIVE'
 $launcherSource = Join-Path $PSScriptRoot 'MpwareLauncher.cs'
+$terminalSource = Join-Path $PSScriptRoot 'MpwareTerminalLauncher.cs'
 $launcherManifest = Join-Path $PSScriptRoot 'MpwareLauncher.manifest'
 $launcherIcon = Join-Path $runtimeRoot 'mpwareIcons\Powershell_black.ico'
 
@@ -23,6 +24,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $runtimeRoot 'mpware.ps1'))) {
 }
 if (-not (Test-Path -LiteralPath $launcherSource)) {
     throw "Missing launcher source: $launcherSource"
+}
+if (-not (Test-Path -LiteralPath $terminalSource)) {
+    throw "Missing terminal launcher source: $terminalSource"
 }
 
 $csc = Get-Command csc.exe -ErrorAction SilentlyContinue
@@ -76,6 +80,7 @@ try {
     }
 
     $cscArgs += $launcherSource
+    $cscArgs += $terminalSource
     & $cscPath @cscArgs
     if ($LASTEXITCODE -ne 0) {
         throw "csc.exe failed with exit code $LASTEXITCODE"
