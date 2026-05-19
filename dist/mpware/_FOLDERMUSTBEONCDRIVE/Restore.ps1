@@ -5,9 +5,57 @@ If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 
     
 $Global:tempDir = (([System.IO.Path]::GetTempPath())).trimend('\')   
+
+if (-not $Global:folder) {
+  $Global:folder = $PSScriptRoot
+}
+if (-not $Global:sysDrive) {
+  $Global:sysDrive = $env:SystemDrive.TrimEnd('\') + '\'
+}
+if (-not $Global:iconDir) {
+  $Global:iconDir = Join-Path $Global:folder 'mpwareIcons'
+}
+if (-not $Global:customIcon) {
+  $Global:customIcon = Join-Path $Global:iconDir 'Powershell_black.ico'
+}
     
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+
+if (Test-Path -LiteralPath (Join-Path $Global:folder 'zFunctions.psm1')) {
+  Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global
+}
+
+if (-not (Get-Command Create-ModernButton -ErrorAction SilentlyContinue)) {
+  function Create-ModernButton {
+    param (
+      [string]$Text,
+      [System.Drawing.Point]$Location,
+      [System.Drawing.Size]$Size,
+      [scriptblock]$ClickAction,
+      $DialogResult,
+      [int]$borderSize = 1
+    )
+    $button = New-Object System.Windows.Forms.Button
+    $button.Text = $Text
+    if ($Location) { $button.Location = $Location }
+    if ($Size) { $button.Size = $Size }
+    if ($DialogResult) { $button.DialogResult = $DialogResult }
+    $button.BackColor = [System.Drawing.Color]::FromArgb(22, 27, 36)
+    $button.ForeColor = [System.Drawing.Color]::White
+    $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $button.FlatAppearance.BorderSize = $borderSize
+    if ($ClickAction) { $button.Add_Click($ClickAction) }
+    return $button
+  }
+}
+
+if (-not (Get-Command Write-Status -ErrorAction SilentlyContinue)) {
+  function Write-Status {
+    param([string]$Message, [string]$Type)
+    Write-Host "[$Type] $Message"
+  }
+}
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
@@ -20,7 +68,12 @@ $form.MaximizeBox = $false
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $form.BackColor = 'Black'
 $form.Font = New-Object System.Drawing.Font('Segoe UI', 9) 
-$form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
+if ($Global:customIcon -and (Test-Path -LiteralPath $Global:customIcon)) {
+  try {
+    $form.Icon = New-Object System.Drawing.Icon -ArgumentList $Global:customIcon
+  }
+  catch {}
+}
 
 $type = $form.GetType()
 $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
@@ -196,13 +249,13 @@ $checkbox15.Location = New-Object System.Drawing.Point(415, 140)
 $checkbox15.AutoSize = $true
 $form.Controls.Add($checkbox15)
 
-$OKButton = Create-ModernButton -Text 'OK' -Size (New-Object Drawing.Size(95, 28)) -DialogResult ([System.Windows.Forms.DialogResult]::OK) -borderSize 2
-$OKButton.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$OKButton = Create-ModernButton -Text 'Apply' -Location (New-Object Drawing.Point(445, 220)) -Size (New-Object Drawing.Size(95, 30)) -DialogResult ([System.Windows.Forms.DialogResult]::OK) -borderSize 2
 $form.Controls.Add($OKButton)
+$form.AcceptButton = $OKButton
 
-$CancelButton = Create-ModernButton -Text 'Cancel' -Size (New-Object Drawing.Size(95, 28)) -DialogResult ([System.Windows.Forms.DialogResult]::OK) -borderSize 2
-$CancelButton.Dock = [System.Windows.Forms.DockStyle]::Bottom
+$CancelButton = Create-ModernButton -Text 'Cancel' -Location (New-Object Drawing.Point(550, 220)) -Size (New-Object Drawing.Size(95, 30)) -DialogResult ([System.Windows.Forms.DialogResult]::Cancel) -borderSize 2
 $form.Controls.Add($CancelButton)
+$form.CancelButton = $CancelButton
     
 
 # Show the form and wait for user input

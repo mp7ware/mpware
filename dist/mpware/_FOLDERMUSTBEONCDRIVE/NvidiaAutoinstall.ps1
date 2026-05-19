@@ -398,6 +398,21 @@ function Get-FileFromWeb {
 
 
 if (!(Check-Internet)) {
+    $nvidiaAdapter = $null
+    try {
+        $nvidiaAdapter = Get-CimInstance Win32_VideoController -ErrorAction Stop |
+        Where-Object { $_.Name -match 'NVIDIA' -or $_.PNPDeviceID -match 'VEN_10DE' } |
+        Select-Object -First 1
+    }
+    catch {}
+    if (-not $nvidiaAdapter) {
+        Write-Status -Message 'No NVIDIA display adapter was detected. If this is a virtual machine, the VM needs NVIDIA GPU passthrough or vGPU for the driver installer to work.' -Type Warning
+        $continueWithoutGpu = Custom-MsgBox -message 'No NVIDIA GPU was detected. Continue anyway?' -type Question
+        if ($continueWithoutGpu -ne 'OK') {
+            return
+        }
+    }
+
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Write-Status -Message 'Checking if 7zip is Installed...' -Type Output
     
@@ -509,43 +524,59 @@ if (!(Check-Internet)) {
     $response = Invoke-RestMethod -Uri $uri -UseBasicParsing
     $versions = $response.IDS.downloadInfo.Version  
 
-    #add html agility pack to parse html response
-    $dllPath = Search-File '*HtmlAgilityPack.dll'
-    Add-Type -Path $dllPath 
-    # NVIDIA API 
-    $searchUrl = 'https://www.nvidia.com/Download/processFind.aspx?psid=120&pfid=929&osid=57&lid=1&whql=1&lang=en-us&ctk=0&dtcid=1'
-    $response = Invoke-WebRequest -Uri $searchUrl -UseBasicParsing
-    $htmlDoc = New-Object HtmlAgilityPack.HtmlDocument
-    $htmlDoc.LoadHtml($response.Content)
-
-    $content = $htmlDoc.DocumentNode.InnerText
-
-    $sections = $content -split 'Release Highlights:'
-
-    # get the 4 latest highlights
-    $highlights = $sections[1..4]
-
-    # cleanup the text
     $releaseHighlights = @()
-    foreach ($highlight in $highlights) {
-        $trimmedHighlight = $highlight.Trim() -replace '\s+', ' '
-        $trimmedHighlight = $trimmedHighlight -replace 'Learn More in our Game Ready Driver article here. GeForce Game Ready Driver&nbsp;' , ''
-        $trimmedHighlight = $trimmedHighlight -replace '&amp;' , '&'
-        $trimmedHighlight = $trimmedHighlight -replace '&ouml;' , 'o' #for god of ragnarok game
-        $trimmedHighlight = $trimmedHighlight -replace '\[\d+\]' , '' #remove issue ids
-        $trimmedHighlight = $trimmedHighlight -replace '  ' , "`n" #move double space to a newline
-        $trimmedHighlight = $trimmedHighlight -replace 'WHQL \d{3}\.\d{2} [A-Za-z]+ \d{1,2}, \d{4}' , '' #remove driver version/release date
-        $trimmedHighlight = $trimmedHighlight -replace '&nbsp;' , ' ' 
-        $trimmedHighlight = $trimmedHighlight -replace '&quot;' , '"' 
-        $trimmedHighlight = $trimmedHighlight -replace '&gt;' , '>' 
-        $releaseHighlights += $trimmedHighlight
-    }
+    try {
+        # NVIDIA API 
+        $searchUrl = 'https://www.nvidia.com/Download/processFind.aspx?psid=120&pfid=929&osid=57&lid=1&whql=1&lang=en-us&ctk=0&dtcid=1'
+        $response = Invoke-WebRequest -Uri $searchUrl -UseBasicParsing -ErrorAction Stop
+        $content = $response.Content
 
+        # HtmlAgilityPack is optional. Fall back to a plain HTML strip when the DLL is not bundled.
+        $dllPath = Search-File '*HtmlAgilityPack.dll'
+        if ($dllPath -and (Test-Path -LiteralPath $dllPath)) {
+            Add-Type -Path $dllPath
+            $htmlDoc = New-Object HtmlAgilityPack.HtmlDocument
+            $htmlDoc.LoadHtml($response.Content)
+            $content = $htmlDoc.DocumentNode.InnerText
+        }
+        else {
+            $content = [System.Text.RegularExpressions.Regex]::Replace($content, '<[^>]+>', ' ')
+        }
+
+        $content = [System.Net.WebUtility]::HtmlDecode($content)
+        $sections = $content -split 'Release Highlights:'
+        if ($sections.Count -gt 1) {
+            $endIndex = [Math]::Min(4, $sections.Count - 1)
+            $highlights = $sections[1..$endIndex]
+
+            # cleanup the text
+            foreach ($highlight in $highlights) {
+                $trimmedHighlight = $highlight.Trim() -replace '\s+', ' '
+                $trimmedHighlight = $trimmedHighlight -replace 'Learn More in our Game Ready Driver article here. GeForce Game Ready Driver' , ''
+                $trimmedHighlight = $trimmedHighlight -replace '\[\d+\]' , '' #remove issue ids
+                $trimmedHighlight = $trimmedHighlight -replace '  ' , "`n" #move double space to a newline
+                $trimmedHighlight = $trimmedHighlight -replace 'WHQL \d{3}\.\d{2} [A-Za-z]+ \d{1,2}, \d{4}' , '' #remove driver version/release date
+                $releaseHighlights += $trimmedHighlight
+            }
+        }
+    }
+    catch {
+        Write-Status -Message "Skipping NVIDIA release notes parser: $($_.Exception.Message)" -Type Warning
+    }
 
     if ($versions -eq $null) {
         Write-Status -Message 'UNABLE TO GET LATEST DRIVERS FROM NVIDIA API'  -Type Warning
         Write-Status -Message 'Use the Text Box Instead Ex. 551.86'  -Type Warning
         
+    }
+
+    if (-not $releaseHighlights -or $releaseHighlights.Count -eq 0) {
+        foreach ($version in @($versions)) {
+            $releaseHighlights += "Release highlights are unavailable for driver $version. You can still continue with the download/install workflow."
+        }
+        if ($releaseHighlights.Count -eq 0) {
+            $releaseHighlights += 'Release highlights are unavailable. Enter a driver version manually or select a local driver file.'
+        }
     }
 
     Add-Type -AssemblyName System.Windows.Forms
@@ -597,7 +628,9 @@ if (!(Check-Internet)) {
     $comboBox.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
     $comboBox.ForeColor = 'White'
     $versions | ForEach-Object { $comboBox.Items.Add($_) }
-    $comboBox.SelectedIndex = 0
+    if ($comboBox.Items.Count -gt 0) {
+        $comboBox.SelectedIndex = 0
+    }
     $form.Controls.Add($comboBox)
 
  
@@ -944,8 +977,10 @@ if (!(Check-Internet)) {
         #uninstalling 7zip
         if ($7zinstalledAlr -eq $false) {
             $path = (Get-ChildItem -Path C:\ -Filter 7-Zip -Recurse -ErrorAction SilentlyContinue -Force | select-object -first 1).FullName
-            Start-Process "$path\Uninstall.exe" -wait -ArgumentList '/S'
-            remove-item 'HKLM:\SOFTWARE\7-Zip' -Force -Recurse -ErrorAction SilentlyContinue
+            if ($path -and (Test-Path -LiteralPath (Join-Path $path 'Uninstall.exe'))) {
+                Start-Process (Join-Path $path 'Uninstall.exe') -wait -ArgumentList '/S'
+                remove-item 'HKLM:\SOFTWARE\7-Zip' -Force -Recurse -ErrorAction SilentlyContinue
+            }
 
         }
 

@@ -90,11 +90,10 @@ namespace mpwareLauncher
             TextBlock logo = Text(" mpware", 24, FontWeights.Bold, _text);
             logoLine.Children.Add(logo);
             brand.Children.Add(logoLine);
-            brand.Children.Add(Text("Performance Toolkit", 12, FontWeights.Normal, _muted));
 
             StackPanel footer = new StackPanel { Margin = new Thickness(20) };
             DockPanel.SetDock(footer, Dock.Bottom);
-            footer.Children.Add(Text("v1.0.0 // NO-BS EDITION", 12, FontWeights.Normal, _muted));
+            footer.Children.Add(Text("v1.0.0", 12, FontWeights.Normal, _muted));
             _statusLine = Text("status: booting", 11, FontWeights.Normal, _muted);
             _statusLine.Margin = new Thickness(0, 10, 0, 0);
             footer.Children.Add(_statusLine);
@@ -193,7 +192,7 @@ namespace mpwareLauncher
             Grid.SetColumn(buttons, 1);
             actions.Children.Add(buttons);
             buttons.Children.Add(ActionButton("APPLY SELECTED", ApplySelectedTweaks, true));
-            buttons.Children.Add(ActionButton("SELECT ALL + IMPORT", ApplyAllTweaks, true));
+            buttons.Children.Add(ActionButton("SELECT ALL", delegate { SelectAllTweaks(); }, false));
             buttons.Children.Add(ActionButton("EXPORT .REG", ExportSelectedReg, false));
             buttons.Children.Add(ActionButton("COPY .PS1", CopySelectedPs1, false));
             buttons.Children.Add(ActionButton("SAVE .PS1", SaveSelectedPs1, false));
@@ -218,22 +217,9 @@ namespace mpwareLauncher
         {
             Grid grid = new Grid();
             grid.Margin = new Thickness(0, 18, 0, 10);
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             TextBlock heading = Text(category, 16, FontWeights.Bold, _accent);
             grid.Children.Add(heading);
-
-            CheckBox select = new CheckBox();
-            select.Content = "Select All";
-            select.Foreground = _muted;
-            select.FontFamily = _mono;
-            select.FontSize = 11;
-            select.VerticalAlignment = VerticalAlignment.Center;
-            select.Checked += delegate { SetCategory(category, true); };
-            select.Unchecked += delegate { SetCategory(category, false); };
-            Grid.SetColumn(select, 1);
-            grid.Children.Add(select);
             return grid;
         }
 
@@ -526,7 +512,7 @@ namespace mpwareLauncher
             how.Child = AboutPanel("HOW TO USE MPWARE.EXE", new string[] {
                 "1. Download and run mpware.exe. Keep it in the extracted release folder or use the bundled standalone exe.",
                 "2. Windows may show UAC when you apply tweaks, debloat, or install NVIDIA drivers. Click Yes only when you trust the action.",
-                "3. Registry Tweaks: select individual groups, use category Select All, or press SELECT ALL + IMPORT to import every bundled registry tweak.",
+                "3. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED to import them.",
                 "4. NVIDIA Driver: press DOWNLOAD AND INSTALL LATEST DRIVER. The PowerShell window stays open if the helper reports an error.",
                 "5. Debloater: start with RECOMMENDED, then restart your PC after registry or app-removal changes."
             }, "");
@@ -937,13 +923,19 @@ namespace mpwareLauncher
             }
 
             SetStatus("launching " + relativeScript);
-            ProcessStartInfo psi = new ProcessStartInfo();
-            psi.FileName = "powershell.exe";
-            psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\"";
-            psi.WorkingDirectory = _runtimeRoot;
-            psi.UseShellExecute = true;
-            psi.Verb = "runas";
-            Process.Start(psi);
+            string escapedRoot = PsEscape(_runtimeRoot);
+            string command =
+                "$ErrorActionPreference='Continue';" +
+                "Set-Location -LiteralPath '" + escapedRoot + "';" +
+                "$Global:folder='" + escapedRoot + "';" +
+                "$Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
+                "$Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
+                "$Global:iconDir=Join-Path $Global:folder 'mpwareIcons';" +
+                "$Global:customIcon=Join-Path $Global:iconDir 'Powershell_black.ico';" +
+                "Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
+                "Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
+                "& '" + PsEscape(script) + "';";
+            RunElevatedPowerShellNoExit(command, "launching " + relativeScript);
         }
 
         private void RunFunction(string functionCall)
