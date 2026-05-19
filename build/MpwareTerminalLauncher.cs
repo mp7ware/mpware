@@ -104,6 +104,7 @@ namespace mpwareLauncher
             dock.Children.Add(nav);
             nav.Children.Add(NavButton("Registry Tweaks", ShowRegistryTweaks));
             nav.Children.Add(NavButton("NVIDIA Driver", ShowNvidiaDriver));
+            nav.Children.Add(NavButton("Debloater", ShowDebloater));
             nav.Children.Add(NavButton("About", ShowAbout));
 
             _content = new Grid();
@@ -191,6 +192,7 @@ namespace mpwareLauncher
             Grid.SetColumn(buttons, 1);
             actions.Children.Add(buttons);
             buttons.Children.Add(ActionButton("APPLY SELECTED", ApplySelectedTweaks, true));
+            buttons.Children.Add(ActionButton("SELECT ALL + IMPORT", ApplyAllTweaks, true));
             buttons.Children.Add(ActionButton("EXPORT .REG", ExportSelectedReg, false));
             buttons.Children.Add(ActionButton("COPY .PS1", CopySelectedPs1, false));
             buttons.Children.Add(ActionButton("SAVE .PS1", SaveSelectedPs1, false));
@@ -300,13 +302,60 @@ namespace mpwareLauncher
             stack.Children.Add(InfoLine("Requires administrator approval."));
             stack.Children.Add(InfoLine("The helper checks the current driver list and starts the install workflow."));
 
-            Button install = ActionButton("DOWNLOAD AND INSTALL LATEST DRIVER", delegate { RunScript("NvidiaAutoinstall.ps1"); }, true);
+            Button install = ActionButton("DOWNLOAD AND INSTALL LATEST DRIVER", delegate { RunNvidiaDriverInstaller(); }, true);
             install.Height = 42;
             install.Margin = new Thickness(0, 24, 0, 0);
             install.HorizontalAlignment = HorizontalAlignment.Stretch;
             stack.Children.Add(install);
 
             RefreshNav();
+        }
+
+        private void ShowDebloater(object sender, RoutedEventArgs e)
+        {
+            StackPanel page = BeginPage("WINDOWS DEBLOATER", "Simple presets for removing bundled Windows apps.", 820);
+
+            Border warning = Box(_danger);
+            warning.Margin = new Thickness(0, 0, 0, 22);
+            StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
+            warning.Child = warningStack;
+            warningStack.Children.Add(Text("/!\\ Debloat changes are permanent", 15, FontWeights.Bold, _danger));
+            warningStack.Children.Add(Text("Removed Store apps usually need to be reinstalled from Microsoft Store or winget. Create a restore point first.", 11, FontWeights.Bold, _text));
+            page.Children.Add(warning);
+
+            Grid grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            grid.ColumnDefinitions.Add(new ColumnDefinition());
+            grid.RowDefinitions.Add(new RowDefinition());
+            grid.RowDefinitions.Add(new RowDefinition());
+            page.Children.Add(grid);
+
+            AddDebloatTile(grid, 0, 0, "RECOMMENDED", "Keeps Store, Xbox and Edge. Best first-pass cleanup.", "debloat -Autorun 1 -debloatSXE 1");
+            AddDebloatTile(grid, 0, 1, "KEEP STORE", "Removes more apps but keeps Microsoft Store.", "debloat -Autorun 1 -debloatS 1");
+            AddDebloatTile(grid, 1, 0, "FULL DEBLOAT", "Aggressive preset. Removes the most bundled apps.", "debloat -Autorun 1 -debloatAll 1");
+            AddDebloatTile(grid, 1, 1, "ADVANCED PRESETS", "Open the full debloat UI for manual choices.", "debloat");
+
+            RefreshNav();
+        }
+
+        private void AddDebloatTile(Grid grid, int row, int col, string title, string description, string functionCall)
+        {
+            Border tile = Box(_border);
+            tile.Margin = new Thickness(col == 0 ? 0 : 10, row == 0 ? 0 : 10, col == 0 ? 10 : 0, row == 0 ? 10 : 0);
+            Grid.SetRow(tile, row);
+            Grid.SetColumn(tile, col);
+            grid.Children.Add(tile);
+
+            StackPanel stack = new StackPanel { Margin = new Thickness(20) };
+            tile.Child = stack;
+            stack.Children.Add(Text(title, 16, FontWeights.Bold, _accent));
+            TextBlock copy = Text(description, 11, FontWeights.Normal, _muted);
+            copy.Margin = new Thickness(0, 10, 0, 18);
+            stack.Children.Add(copy);
+
+            Button run = ActionButton("RUN", delegate { RunFunctionWithVisibleConsole(functionCall); }, true);
+            run.HorizontalAlignment = HorizontalAlignment.Stretch;
+            stack.Children.Add(run);
         }
 
         private void ShowAbout(object sender, RoutedEventArgs e)
@@ -367,11 +416,11 @@ namespace mpwareLauncher
             Border how = Box(_border);
             how.Margin = new Thickness(0, 0, 12, 0);
             how.Child = AboutPanel("HOW TO USE MPWARE.EXE", new string[] {
-                "1. Download mpware.exe from the Registry Tweaks page.",
-                "2. Double-click it. Windows prompts UAC - click Yes to allow admin.",
-                "3. A terminal UI opens. Navigate categories with mouse or keyboard.",
-                "4. Select tweaks and press APPLY SELECTED to write registry keys.",
-                "5. Restart your PC when done."
+                "1. Download and run mpware.exe. Keep it in the extracted release folder or use the bundled standalone exe.",
+                "2. Windows may show UAC when you apply tweaks, debloat, or install NVIDIA drivers. Click Yes only when you trust the action.",
+                "3. Registry Tweaks: select individual groups, use category Select All, or press SELECT ALL + IMPORT to import every bundled registry tweak.",
+                "4. NVIDIA Driver: press DOWNLOAD AND INSTALL LATEST DRIVER. The PowerShell window stays open if the helper reports an error.",
+                "5. Debloater: start with RECOMMENDED, then restart your PC after registry or app-removal changes."
             }, "Keys:  Tab move   Space select   Enter activate");
             two.Children.Add(how);
 
@@ -526,6 +575,24 @@ namespace mpwareLauncher
             return selected;
         }
 
+        private void SelectAllTweaks()
+        {
+            foreach (TweakItem tweak in _tweaks)
+            {
+                if (tweak.Selector != null)
+                {
+                    tweak.Selector.IsChecked = true;
+                }
+            }
+            UpdateSelectedCount();
+        }
+
+        private void ApplyAllTweaks(object sender, RoutedEventArgs e)
+        {
+            SelectAllTweaks();
+            ApplyRegistryTweaks(new List<TweakItem>(_tweaks), "all registry tweak groups");
+        }
+
         private void ApplySelectedTweaks(object sender, RoutedEventArgs e)
         {
             List<TweakItem> selected = GetSelectedTweaks();
@@ -535,6 +602,11 @@ namespace mpwareLauncher
                 return;
             }
 
+            ApplyRegistryTweaks(selected, selected.Count + " registry tweak groups");
+        }
+
+        private void ApplyRegistryTweaks(List<TweakItem> selected, string label)
+        {
             string regPath = IOPath.Combine(IOPath.GetTempPath(), "mpware-selected-" + Guid.NewGuid().ToString("N") + ".reg");
             File.WriteAllText(regPath, BuildRegFile(selected), Encoding.Unicode);
             string script =
@@ -546,7 +618,7 @@ namespace mpwareLauncher
                 "try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch {};" +
                 "Write-Host 'mpware: registry tweaks applied. Restart recommended.' -ForegroundColor Green;" +
                 "Pause";
-            RunElevatedPowerShell(script, "applying " + selected.Count + " registry tweak groups");
+            RunElevatedPowerShell(script, "applying " + label);
         }
 
         private void ExportSelectedReg(object sender, RoutedEventArgs e)
@@ -652,6 +724,36 @@ namespace mpwareLauncher
             return sb.ToString();
         }
 
+        private void RunNvidiaDriverInstaller()
+        {
+            if (!EnsureRuntime())
+            {
+                return;
+            }
+
+            string script = IOPath.Combine(_runtimeRoot, "NvidiaAutoinstall.ps1");
+            if (!File.Exists(script))
+            {
+                MessageBox.Show("Missing runtime script: NvidiaAutoinstall.ps1", "mpware", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string command =
+                "$ErrorActionPreference='Stop';" +
+                "try {" +
+                "  Set-Location -LiteralPath '" + PsEscape(_runtimeRoot) + "';" +
+                "  Write-Host 'mpware: starting NVIDIA driver helper...' -ForegroundColor Cyan;" +
+                "  & '" + PsEscape(script) + "';" +
+                "  Write-Host 'mpware: NVIDIA helper finished.' -ForegroundColor Green;" +
+                "} catch {" +
+                "  Write-Host ''; Write-Host 'mpware: NVIDIA helper failed:' -ForegroundColor Red;" +
+                "  Write-Host $_.Exception.Message -ForegroundColor Red;" +
+                "  Write-Host ''; Read-Host 'Press Enter to close';" +
+                "}";
+
+            RunElevatedPowerShellNoExit(command, "launching NVIDIA driver helper");
+        }
+
         private void CopyNvidiaPs1(object sender, RoutedEventArgs e)
         {
             Clipboard.SetText(BuildNvidiaLauncherScript());
@@ -684,6 +786,19 @@ namespace mpwareLauncher
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = "powershell.exe";
             psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded;
+            psi.UseShellExecute = true;
+            psi.Verb = "runas";
+            Process.Start(psi);
+        }
+
+        private void RunElevatedPowerShellNoExit(string script, string log)
+        {
+            SetStatus(log);
+            string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "powershell.exe";
+            psi.Arguments = "-NoExit -NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded;
+            psi.WorkingDirectory = _runtimeRoot;
             psi.UseShellExecute = true;
             psi.Verb = "runas";
             Process.Start(psi);
@@ -734,6 +849,36 @@ namespace mpwareLauncher
                 "Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
                 functionCall;
             RunElevatedPowerShell(command, "launching " + functionCall);
+        }
+
+        private void RunFunctionWithVisibleConsole(string functionCall)
+        {
+            if (!EnsureRuntime())
+            {
+                return;
+            }
+
+            SetStatus("launching " + functionCall);
+            string escapedRoot = PsEscape(_runtimeRoot);
+            string command =
+                "$ErrorActionPreference='Continue';" +
+                "try {" +
+                "  Set-Location -LiteralPath '" + escapedRoot + "';" +
+                "  $Global:folder='" + escapedRoot + "';" +
+                "  $Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
+                "  $Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
+                "  $Global:iconDir=Join-Path $Global:folder 'mpwareIcons';" +
+                "  $Global:customIcon=Join-Path $Global:iconDir 'Powershell_black.ico';" +
+                "  Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
+                "  Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
+                "  " + functionCall + ";" +
+                "  Write-Host 'mpware: command finished.' -ForegroundColor Green;" +
+                "} catch {" +
+                "  Write-Host ''; Write-Host 'mpware: command failed:' -ForegroundColor Red;" +
+                "  Write-Host $_.Exception.Message -ForegroundColor Red;" +
+                "};" +
+                "Write-Host ''; Read-Host 'Press Enter to close'";
+            RunElevatedPowerShellNoExit(command, "launching " + functionCall);
         }
 
         private bool EnsureRuntime()
