@@ -17,7 +17,7 @@ $runtimeRoot = Join-Path $PackageRoot '_FOLDERMUSTBEONCDRIVE'
 $launcherSource = Join-Path $PSScriptRoot 'MpwareLauncher.cs'
 $terminalSource = Join-Path $PSScriptRoot 'MpwareTerminalLauncher.cs'
 $launcherManifest = Join-Path $PSScriptRoot 'MpwareLauncher.manifest'
-$launcherIcon = Join-Path $runtimeRoot 'mpwareIcons\Powershell_black.ico'
+$launcherIcon = Join-Path $runtimeRoot 'mpwareIcons\mp7.ico'
 
 if (-not (Test-Path -LiteralPath (Join-Path $runtimeRoot 'mpware.ps1'))) {
     throw "Missing runtime script: $runtimeRoot"

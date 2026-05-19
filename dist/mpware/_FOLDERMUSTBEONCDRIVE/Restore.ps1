@@ -16,7 +16,7 @@ if (-not $Global:iconDir) {
   $Global:iconDir = Join-Path $Global:folder 'mpwareIcons'
 }
 if (-not $Global:customIcon) {
-  $Global:customIcon = Join-Path $Global:iconDir 'Powershell_black.ico'
+  $Global:customIcon = Join-Path $Global:iconDir 'mp7.ico'
 }
     
 Add-Type -AssemblyName System.Windows.Forms
