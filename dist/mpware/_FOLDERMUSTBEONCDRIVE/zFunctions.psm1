@@ -6122,7 +6122,7 @@ function OptionalTweaks {
     $label2 = New-Object System.Windows.Forms.Label
     $label2.Location = New-Object System.Drawing.Point(20, 10)
     $label2.Size = New-Object System.Drawing.Size(200, 20)
-    $label2.Text = 'Add to Menu'
+    $label2.Text = 'Context Menu'
     $label2.ForeColor = 'White'
     $label2.BackColor = [System.Drawing.Color]::Transparent
     $label2.Font = New-Object System.Drawing.Font('Segoe UI', 12, [System.Drawing.FontStyle]::Bold)
@@ -6131,7 +6131,7 @@ function OptionalTweaks {
     $label3 = New-Object System.Windows.Forms.Label
     $label3.Location = New-Object System.Drawing.Point(270, 10)
     $label3.Size = New-Object System.Drawing.Size(200, 20)
-    $label3.Text = 'Remove From Menu'
+    $label3.Text = ''
     $label3.ForeColor = 'White'
     $label3.BackColor = [System.Drawing.Color]::Transparent
     $label3.Font = New-Object System.Drawing.Font('Segoe UI', 12, [System.Drawing.FontStyle]::Bold)
@@ -6533,6 +6533,19 @@ function OptionalTweaks {
     $checkbox65.Checked = $false
     $form.Controls.Add($checkbox65)
     $contextMenuPanel.Controls.Add($checkbox65)
+
+    $checkbox17.Location = New-Object System.Drawing.Size(20, 40)
+    $checkbox18.Location = New-Object System.Drawing.Size(20, 70)
+    $checkbox20.Location = New-Object System.Drawing.Size(20, 100)
+    @(
+      $checkbox14, $checkbox15, $checkbox16, $checkbox19, $checkbox26, $checkbox34,
+      $checkbox35, $checkbox36, $checkbox37, $checkbox38, $checkbox39, $checkbox40,
+      $checkbox41, $checkbox42, $checkbox43, $checkbox44, $checkbox46, $checkbox48,
+      $checkbox49, $checkbox65
+    ) | ForEach-Object {
+      $_.Checked = $false
+      $_.Visible = $false
+    }
 
 
     $checkbox66.Location = New-Object System.Drawing.Size(20, 50)
