@@ -397,11 +397,11 @@ function Convert-MpwareSnapshotData {
   param([pscustomobject]$Entry)
 
   switch ($Entry.Kind) {
-    'Binary' { return [Convert]::FromBase64String([string]$Entry.Data) }
-    'None' { return [Convert]::FromBase64String([string]$Entry.Data) }
+    'Binary' { Write-Output -NoEnumerate ([Convert]::FromBase64String([string]$Entry.Data)); return }
+    'None' { Write-Output -NoEnumerate ([Convert]::FromBase64String([string]$Entry.Data)); return }
     'DWord' { return [int]$Entry.Data }
     'QWord' { return [long]$Entry.Data }
-    'MultiString' { return @($Entry.Data) }
+    'MultiString' { Write-Output -NoEnumerate ([string[]]@($Entry.Data)); return }
     default { return $Entry.Data }
   }
 }
