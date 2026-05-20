@@ -758,6 +758,7 @@ namespace mpwareLauncher
                 "Write-Host 'mpware: progress log' -ForegroundColor Cyan;" +
                 "Write-Host 'mpware: preparing to apply " + PsEscape(label) + "...' -ForegroundColor Cyan;" +
                 RestorePointScript("registry tweaks") +
+                RegistrySnapshotScript(applyPowerPlan, applyClearStartPins) +
                 RegistryDeleteScript() +
                 "Write-Host 'mpware: importing selected registry tweaks with reg.exe...' -ForegroundColor Cyan;" +
                 "$regExe=Join-Path $env:SystemRoot 'System32\\reg.exe';" +
@@ -1172,6 +1173,15 @@ namespace mpwareLauncher
                 "  } catch {" +
                 "    Write-Host ('mpware: restore point skipped: ' + $_.Exception.Message) -ForegroundColor Yellow;" +
                 "  };";
+        }
+
+        private string RegistrySnapshotScript(bool includePowerPlan, bool includeStartPins)
+        {
+            return
+                "Write-Host 'mpware: saving restore snapshot...' -ForegroundColor Cyan;" +
+                "if (-not (Get-Command Save-MpwareRegistrySnapshot -ErrorAction SilentlyContinue)) { throw 'Restore snapshot helper was not loaded' };" +
+                "$snapshotPath=Save-MpwareRegistrySnapshot -ChecksPath $checks -IncludePowerPlan:$" + (includePowerPlan ? "true" : "false") + " -IncludeStartPins:$" + (includeStartPins ? "true" : "false") + ";" +
+                "Write-Host ('mpware: restore snapshot saved to ' + $snapshotPath) -ForegroundColor Green;";
         }
 
         private string BlackWallpaperScript()
