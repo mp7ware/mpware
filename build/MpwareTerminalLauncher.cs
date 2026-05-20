@@ -412,7 +412,7 @@ namespace mpwareLauncher
             box.Child = stack;
             stack.Children.Add(Text("RECOMMENDED", 16, FontWeights.Bold, _accent));
 
-            TextBlock copy = Text("Removes bundled Windows bloat and Copilot while keeping Microsoft Store, Xbox components, and Edge.", 11, FontWeights.Normal, _muted);
+            TextBlock copy = Text("Removes OneDrive, Copilot, Widgets, Teams, and bundled Windows bloat while keeping Microsoft Store, Xbox components, and Edge.", 11, FontWeights.Normal, _muted);
             copy.Margin = new Thickness(0, 12, 0, 20);
             stack.Children.Add(copy);
 
@@ -704,6 +704,7 @@ namespace mpwareLauncher
                 "$checks='" + PsEscape(checksPath) + "';" +
                 "$Global:folder='" + escapedRoot + "';" +
                 "if (-not [string]::IsNullOrWhiteSpace($Global:folder)) { Set-Location -LiteralPath $Global:folder };" +
+                "if (Test-Path -LiteralPath (Join-Path $Global:folder 'MpwareRuntime.ps1')) { . (Join-Path $Global:folder 'MpwareRuntime.ps1'); if (Get-Command Disable-MpwareConsoleQuickEdit -ErrorAction SilentlyContinue) { Disable-MpwareConsoleQuickEdit } };" +
                 "$host.UI.RawUI.WindowTitle='mpware progress log';" +
                 "Clear-Host;" +
                 "try {" +
@@ -900,16 +901,16 @@ namespace mpwareLauncher
                 "  $Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
                 "  $Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
                 "  . (Join-Path $Global:folder 'MpwareRuntime.ps1');" +
+                "  if (Get-Command Disable-MpwareConsoleQuickEdit -ErrorAction SilentlyContinue) { Disable-MpwareConsoleQuickEdit };" +
                 "  if (-not (Test-Path -LiteralPath (Join-Path $Global:nvidiaFolder 'DefaultProfile.nip'))) { throw 'DefaultProfile.nip is missing' };" +
                 "  if (-not (Test-Path -LiteralPath (Join-Path $Global:nvidiaFolder 'nvidiaProfileInspector.exe'))) { throw 'nvidiaProfileInspector.exe is missing' };" +
                 "  Write-Host 'mpware: starting NVIDIA driver helper with bundled Inspector profile...' -ForegroundColor Cyan;" +
                 "  & '" + PsEscape(script) + "';" +
                 "  Write-Host 'mpware: NVIDIA helper finished.' -ForegroundColor Green;" +
-                "  exit 0;" +
                 "} catch {" +
                 "  Write-Host ''; Write-Host 'mpware: NVIDIA helper failed:' -ForegroundColor Red;" +
                 "  Write-Host $_.Exception.Message -ForegroundColor Red;" +
-                "  Write-Host ''; Read-Host 'Press Enter to close'; exit 1;" +
+                "  Write-Host ''; Read-Host 'Press Enter to close';" +
                 "}";
 
             RunElevatedPowerShell(command, "launching NVIDIA driver helper");
@@ -918,10 +919,10 @@ namespace mpwareLauncher
         private void RunElevatedPowerShell(string script, string log)
         {
             SetStatus(log);
-            string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+            string tempScript = WriteTemporaryPowerShellScript(script);
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = "powershell.exe";
-            psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded;
+            psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + tempScript + "\"";
             if (!String.IsNullOrWhiteSpace(_runtimeRoot))
             {
                 psi.WorkingDirectory = _runtimeRoot;
@@ -929,6 +930,18 @@ namespace mpwareLauncher
             psi.UseShellExecute = true;
             psi.Verb = "runas";
             Process.Start(psi);
+        }
+
+        private string WriteTemporaryPowerShellScript(string script)
+        {
+            string path = IOPath.Combine(IOPath.GetTempPath(), "mpware-run-" + Guid.NewGuid().ToString("N") + ".ps1");
+            string content =
+                "$ErrorActionPreference='Continue'" + Environment.NewLine +
+                script + Environment.NewLine +
+                "Start-Sleep -Milliseconds 150" + Environment.NewLine +
+                "Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue" + Environment.NewLine;
+            File.WriteAllText(path, content, new UTF8Encoding(false));
+            return path;
         }
 
         private void RunScript(string relativeScript)
@@ -953,7 +966,7 @@ namespace mpwareLauncher
                 "$Global:folder='" + escapedRoot + "';" +
                 "$Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
                 "$Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
-                "if (Test-Path -LiteralPath (Join-Path $Global:folder 'MpwareRuntime.ps1')) { . (Join-Path $Global:folder 'MpwareRuntime.ps1') };" +
+                "if (Test-Path -LiteralPath (Join-Path $Global:folder 'MpwareRuntime.ps1')) { . (Join-Path $Global:folder 'MpwareRuntime.ps1'); if (Get-Command Disable-MpwareConsoleQuickEdit -ErrorAction SilentlyContinue) { Disable-MpwareConsoleQuickEdit } };" +
                 "& '" + PsEscape(script) + "';";
             RunElevatedPowerShell(command, "launching " + relativeScript);
         }
@@ -979,14 +992,14 @@ namespace mpwareLauncher
                 "  $Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
                 "  $Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
                 "  . (Join-Path $Global:folder 'MpwareRuntime.ps1');" +
+                "  if (Get-Command Disable-MpwareConsoleQuickEdit -ErrorAction SilentlyContinue) { Disable-MpwareConsoleQuickEdit };" +
                 "  Write-Host 'mpware: starting " + PsEscape(functionCall) + "...' -ForegroundColor Cyan;" +
                 "  " + functionCall + ";" +
                 "  Write-Host 'mpware: command finished.' -ForegroundColor Green;" +
-                "  exit 0;" +
                 "} catch {" +
                 "  Write-Host ''; Write-Host 'mpware: command failed:' -ForegroundColor Red;" +
                 "  Write-Host $_.Exception.Message -ForegroundColor Red;" +
-                "  Write-Host ''; Read-Host 'Press Enter to close'; exit 1;" +
+                "  Write-Host ''; Read-Host 'Press Enter to close';" +
                 "}";
             RunElevatedPowerShell(command, "launching " + functionCall);
         }
@@ -1215,17 +1228,6 @@ namespace mpwareLauncher
 
             string mainReg = IOPath.Combine(_runtimeRoot, "RegTweaks.txt");
             LoadRegFile(mainReg, "REGISTRY TWEAKS");
-
-            string contextMenu = IOPath.Combine(_runtimeRoot, "UltimateContextMenu");
-            if (Directory.Exists(contextMenu))
-            {
-                string[] regFiles = Directory.GetFiles(contextMenu, "*.reg");
-                Array.Sort(regFiles, StringComparer.OrdinalIgnoreCase);
-                foreach (string regFile in regFiles)
-                {
-                    LoadRegFile(regFile, "CONTEXT MENU");
-                }
-            }
 
             for (int i = _tweaks.Count - 1; i >= 0; i--)
             {

@@ -389,7 +389,7 @@ if (Check-Internet) {
         $7zip = 'https://www.7-zip.org/a/7z2301-x64.exe'
         $output = "$tempDir\7Zip.exe"
         $ProgressPreference = 'SilentlyContinue' 
-        Invoke-RestMethod $7zip -OutFile $output | Wait-Event -Timeout 1
+        Invoke-WebRequest -Uri $7zip -OutFile $output -UseBasicParsing
         
         Start-Process $output -Wait -ArgumentList '/S' 
         # Delete the installer once it completes
@@ -403,11 +403,6 @@ if (Check-Internet) {
         }   
     }
     
-
-    Write-Status -Message 'Skipping old safe-mode cleanup so the driver installer continues in this Windows session.' -Type Output
-   
-
-        
 
     #getting latest driver version num
     $uri = 'https://gfwsl.geforce.com/services_toolkit/services/com/nvidia/services/AjaxDriverService.php' +
@@ -466,8 +461,13 @@ if (Check-Internet) {
     Add-Type -AssemblyName System.Windows.Forms
     [System.Windows.Forms.Application]::EnableVisualStyles()
 
+    $accentColor = [System.Drawing.Color]::FromArgb(0, 239, 246)
+    $panelColor = [System.Drawing.Color]::FromArgb(5, 5, 5)
+    $inputColor = [System.Drawing.Color]::FromArgb(10, 10, 10)
+    $borderColor = [System.Drawing.Color]::FromArgb(236, 236, 236)
+
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = 'Nvidia Autoinstall'
+    $form.Text = 'mpware NVIDIA driver'
     $form.Size = New-Object System.Drawing.Size(550, 470)
     $form.FormBorderStyle = 'FixedDialog'
     $form.StartPosition = 'CenterScreen'
@@ -478,8 +478,8 @@ if (Check-Internet) {
     $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
     $propInfo.SetValue($form, $true, $null)
 
-    $startColor = [System.Drawing.Color]::FromArgb(61, 74, 102)   #rgb(61, 74, 102)
-    $endColor = [System.Drawing.Color]::FromArgb(0, 0, 0)       #rgb(0, 0, 0)
+    $startColor = [System.Drawing.Color]::FromArgb(0, 0, 0)
+    $endColor = [System.Drawing.Color]::FromArgb(0, 0, 0)
 
     # Override the form's paint event to apply the gradient
     $form.Add_Paint({
@@ -497,10 +497,10 @@ if (Check-Internet) {
 
     $labelCombo = New-Object System.Windows.Forms.Label
     $labelCombo.Location = New-Object System.Drawing.Point(20, 10)
-    $labelCombo.Size = New-Object System.Drawing.Size(250, 20)
-    $labelCombo.ForeColor = 'White'
+    $labelCombo.Size = New-Object System.Drawing.Size(310, 20)
+    $labelCombo.ForeColor = $accentColor
     $labelCombo.BackColor = [System.Drawing.Color]::Transparent
-    $labelCombo.Text = 'Choose NVIDIA Game Ready Driver:'
+    $labelCombo.Text = '[ ] CHOOSE NVIDIA GAME READY DRIVER'
     $labelCombo.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
     $form.Controls.Add($labelCombo)
 
@@ -508,7 +508,7 @@ if (Check-Internet) {
     $comboBox.Location = New-Object System.Drawing.Point(20, 40)
     $comboBox.Size = New-Object System.Drawing.Size(200, 20)
     $comboBox.DropDownStyle = 'DropDownList'
-    $comboBox.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+    $comboBox.BackColor = $inputColor
     $comboBox.ForeColor = 'White'
     $versions | ForEach-Object { $comboBox.Items.Add($_) }
     $comboBox.SelectedIndex = 0
@@ -522,8 +522,9 @@ if (Check-Internet) {
     $textBox.Text = $ReleaseHighlights[0]
     $textBox.ReadOnly = $true
     $textBox.ScrollBars = 'Vertical'
-    $textBox.BackColor = 'Black'
+    $textBox.BackColor = $panelColor
     $textBox.ForeColor = 'White'
+    $textBox.BorderStyle = 'FixedSingle'
     $form.Controls.Add($textBox)
 
     $comboBox.Add_SelectedIndexChanged({
@@ -535,7 +536,7 @@ if (Check-Internet) {
     $checkbox.Location = New-Object System.Drawing.Point(20, 280)
     $checkbox.Size = New-Object System.Drawing.Size(110, 20)
     $checkbox.ForeColor = 'White'
-    $checkbox.Text = 'Strip Driver?'
+    $checkbox.Text = 'Strip driver'
     $checkbox.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($checkbox)
 
@@ -543,7 +544,7 @@ if (Check-Internet) {
     $checkbox2.Location = New-Object System.Drawing.Point(130, 280)
     $checkbox2.Size = New-Object System.Drawing.Size(250, 20)
     $checkbox2.ForeColor = 'White'
-    $checkbox2.Text = 'Install Notebook Version (laptops)'
+    $checkbox2.Text = 'Install notebook version (laptops)'
     $checkbox2.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($checkbox2)
 
@@ -552,7 +553,8 @@ if (Check-Internet) {
     $label.Location = New-Object System.Drawing.Point(20, 310)
     $label.Size = New-Object System.Drawing.Size(130, 30)
     $label.ForeColor = 'White'
-    $label.Text = 'Driver not listed?'
+    $label.ForeColor = $accentColor
+    $label.Text = 'DRIVER NOT LISTED'
     $label.BackColor = [System.Drawing.Color]::Transparent
     $label.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
     $form.Controls.Add($label)
@@ -561,7 +563,7 @@ if (Check-Internet) {
     $label2.Location = New-Object System.Drawing.Point(20, 343)
     $label2.Size = New-Object System.Drawing.Size(130, 30)
     $label2.ForeColor = 'White'
-    $label2.Text = 'Enter Version Number:'
+    $label2.Text = 'Enter version number:'
     $label2.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($label2)
 
@@ -577,7 +579,7 @@ if (Check-Internet) {
     $label4.Location = New-Object System.Drawing.Point(20, 382)
     $label4.Size = New-Object System.Drawing.Size(90, 30)
     $label4.ForeColor = 'White'
-    $label4.Text = 'Select Driver File:'
+    $label4.Text = 'Select driver file:'
     $label4.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($label4)
 
@@ -586,7 +588,7 @@ if (Check-Internet) {
     $textboxCustom.Size = New-Object System.Drawing.Size(80, 20)
     $textboxCustom.Text = 'Ex. 420.69'
     $textboxCustom.ForeColor = 'White'
-    $textboxCustom.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+    $textboxCustom.BackColor = $inputColor
     $textboxCustom.MaxLength = 8
     $form.Controls.Add($textboxCustom)
     $textboxCustom.Add_TextChanged({
@@ -604,7 +606,7 @@ if (Check-Internet) {
     $textboxCustom2.Size = New-Object System.Drawing.Size(140, 20)
     $textboxCustom2.Text = ''
     $textboxCustom2.ForeColor = 'White'
-    $textboxCustom2.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+    $textboxCustom2.BackColor = $inputColor
     $form.Controls.Add($textboxCustom2)
 
     $textboxCustom2.Add_TextChanged({
@@ -622,10 +624,11 @@ if (Check-Internet) {
     $filebrowsebttn.Text = '...'
     $filebrowsebttn.Cursor = 'Hand'
     $filebrowsebttn.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-    $filebrowsebttn.BackColor = [System.Drawing.Color]::FromArgb(18, 19, 27)
+    $filebrowsebttn.BackColor = $panelColor
     $filebrowsebttn.ForeColor = [System.Drawing.Color]::White
-    #$filebrowsebttn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    #$filebrowsebttn.FlatAppearance.BorderSize = 1
+    $filebrowsebttn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $filebrowsebttn.FlatAppearance.BorderSize = 1
+    $filebrowsebttn.FlatAppearance.BorderColor = $borderColor
     $filebrowsebttn.Add_Click({    
             $driverFile = Show-ModernFilePicker -mode File -fileType 'exe'
             if ($driverFile) {
@@ -636,11 +639,11 @@ if (Check-Internet) {
 
     
 
-    $buttonOK = Create-ModernButton -Text 'OK' -Location (New-Object Drawing.Point(430, 390)) -Size (New-Object Drawing.Size(80, 27)) -DialogResult ([System.Windows.Forms.DialogResult]::OK) -borderSize 2
+    $buttonOK = Create-ModernButton -Text 'INSTALL' -Location (New-Object Drawing.Point(410, 390)) -Size (New-Object Drawing.Size(100, 27)) -DialogResult ([System.Windows.Forms.DialogResult]::OK) -borderSize 2
 
     $form.Controls.Add($buttonOK)
 
-    $buttonSkip = Create-ModernButton -Text 'Skip' -Location (New-Object Drawing.Point(345, 390)) -Size (New-Object Drawing.Size(80, 27)) -DialogResult ([System.Windows.Forms.DialogResult]::Cancel) -borderSize 2
+    $buttonSkip = Create-ModernButton -Text 'CLOSE' -Location (New-Object Drawing.Point(300, 390)) -Size (New-Object Drawing.Size(100, 27)) -DialogResult ([System.Windows.Forms.DialogResult]::Cancel) -borderSize 2
 
     $form.Controls.Add($buttonSkip)
 
@@ -763,7 +766,7 @@ if (Check-Internet) {
             Write-Status -Message '7zip not installed '  -Type Error
      
             Start-Sleep 3
-            exit
+            throw '7-Zip could not be installed or detected.'
         }
 
 
@@ -1053,24 +1056,28 @@ if (Check-Internet) {
     Add-Type -AssemblyName PresentationCore
     [System.Windows.Forms.Application]::EnableVisualStyles()
 
+    $accentColor = [System.Drawing.Color]::FromArgb(0, 239, 246)
+    $panelColor = [System.Drawing.Color]::FromArgb(5, 5, 5)
+    $inputColor = [System.Drawing.Color]::FromArgb(10, 10, 10)
+
     $form = New-Object System.Windows.Forms.Form
     $form.Size = New-Object System.Drawing.Size(400, 430)
     $form.StartPosition = 'CenterScreen'
-    $form.Text = 'Post Install Tweaks'
+    $form.Text = 'mpware NVIDIA tweaks'
     $form.BackColor = 'Black'
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
 
     $TabControl = New-Object System.Windows.Forms.TabControl
     $TabControl.Location = New-Object System.Drawing.Size(10, 10)
     $TabControl.Size = New-Object System.Drawing.Size(370, 350) 
-    $TabControl.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 48)
+    $TabControl.BackColor = $panelColor
 
     $type = $TabControl.GetType()
     $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
     $propInfo.SetValue($TabControl, $true, $null)
 
-    $startColor = [System.Drawing.Color]::FromArgb(61, 74, 102)   #rgb(61, 74, 102)
-    $endColor = [System.Drawing.Color]::FromArgb(0, 0, 0)       #rgb(0, 0, 0)
+    $startColor = [System.Drawing.Color]::FromArgb(0, 0, 0)
+    $endColor = [System.Drawing.Color]::FromArgb(0, 0, 0)
 
     # Override the form's paint event to apply the gradient
     $TabControl.Add_Paint({
@@ -1090,7 +1097,7 @@ if (Check-Internet) {
 
     $TabPage1 = New-Object System.Windows.Forms.TabPage
     $TabPage1.Text = 'General'
-    $TabPage1.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 48)
+    $TabPage1.BackColor = $panelColor
 
     $type = $TabPage1.GetType()
     $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
@@ -1112,7 +1119,7 @@ if (Check-Internet) {
 
     $TabPage2 = New-Object System.Windows.Forms.TabPage
     $TabPage2.Text = 'Monitor'
-    $TabPage2.BackColor = [System.Drawing.Color]::FromArgb(45, 45, 48)
+    $TabPage2.BackColor = $panelColor
 
     $type = $TabPage2.GetType()
     $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
@@ -1247,7 +1254,7 @@ if (Check-Internet) {
 
     $vibrance = New-Object System.Windows.Forms.Label
     $vibrance.Text = 'Digital Vibrance'
-    $vibrance.ForeColor = 'White'
+    $vibrance.ForeColor = $accentColor
     $vibrance.BackColor = [System.Drawing.Color]::Transparent
     $vibrance.AutoSize = $true
     $vibrance.Font = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold) 
@@ -1270,7 +1277,7 @@ if (Check-Internet) {
     $textboxCustom.Text = 'Select Path to .nip'
     $textboxCustom.Visible = $false
     $textboxCustom.ForeColor = 'White'
-    $textboxCustom.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
+    $textboxCustom.BackColor = $inputColor
     $TabPage1.Controls.Add($textboxCustom)
 
     $filebrowsebttn = New-Object System.Windows.Forms.Button
@@ -1280,7 +1287,7 @@ if (Check-Internet) {
     $filebrowsebttn.Visible = $false
     $filebrowsebttn.Cursor = 'Hand'
     $filebrowsebttn.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
-    $filebrowsebttn.BackColor = [System.Drawing.Color]::FromArgb(18, 19, 27)
+    $filebrowsebttn.BackColor = $panelColor
     $filebrowsebttn.ForeColor = [System.Drawing.Color]::White
     $filebrowsebttn.Add_Click({    
             $nip = Show-ModernFilePicker -mode File -fileType 'nip'

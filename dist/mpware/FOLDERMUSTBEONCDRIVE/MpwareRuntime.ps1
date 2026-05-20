@@ -39,6 +39,40 @@ function Search-File {
   return $null
 }
 
+function Disable-MpwareConsoleQuickEdit {
+  try {
+    if (-not ('MpwareNative.ConsoleMode' -as [type])) {
+      Add-Type -Namespace MpwareNative -Name ConsoleMode -MemberDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class ConsoleMode {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern IntPtr GetStdHandle(int nStdHandle);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out int lpMode);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int dwMode);
+}
+"@
+    }
+
+    $stdinHandle = [MpwareNative.ConsoleMode]::GetStdHandle(-10)
+    if ($stdinHandle -eq [IntPtr]::Zero -or $stdinHandle.ToInt64() -eq -1) {
+      return
+    }
+
+    $mode = 0
+    if ([MpwareNative.ConsoleMode]::GetConsoleMode($stdinHandle, [ref]$mode)) {
+      $ENABLE_EXTENDED_FLAGS = 0x0080
+      $ENABLE_QUICK_EDIT = 0x0040
+      $updatedMode = ($mode -bor $ENABLE_EXTENDED_FLAGS) -band (-bnot $ENABLE_QUICK_EDIT)
+      [MpwareNative.ConsoleMode]::SetConsoleMode($stdinHandle, $updatedMode) | Out-Null
+    }
+  }
+  catch {
+  }
+}
+
 function Clear-MpwareFolderContents {
   param([string]$Path)
 
@@ -150,10 +184,20 @@ function Invoke-MpwareWingetInstall {
     throw "winget is required to install $DisplayName on this PC."
   }
 
+  Disable-MpwareConsoleQuickEdit
   Write-Status "Installing $DisplayName with winget..."
-  & winget install --id $Id -e --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity --silent
-  if ($LASTEXITCODE -ne 0) {
-    throw "winget install failed for $DisplayName (exit code $LASTEXITCODE)."
+  $process = Start-Process -FilePath 'winget.exe' -ArgumentList @(
+    'install',
+    '--id', $Id,
+    '-e',
+    '--source', 'winget',
+    '--accept-package-agreements',
+    '--accept-source-agreements',
+    '--disable-interactivity',
+    '--silent'
+  ) -NoNewWindow -Wait -PassThru
+  if ($process.ExitCode -ne 0) {
+    throw "winget install failed for $DisplayName (exit code $($process.ExitCode))."
   }
   Write-Status "$DisplayName install finished." 'Success'
 }
@@ -242,23 +286,49 @@ function Install-MpwarePackages {
 function Remove-MpwareAppxPattern {
   param([string]$Pattern)
 
-  $installed = Get-AppxPackage -AllUsers -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like $Pattern -or $_.PackageFullName -like $Pattern }
+  $installed = @()
+  try {
+    $installed = Get-AppxPackage -AllUsers -ErrorAction Stop |
+      Where-Object { $_.Name -like $Pattern -or $_.PackageFullName -like $Pattern }
+  }
+  catch {
+    Write-Status "Falling back to current-user AppX lookup for $($Pattern): $($_.Exception.Message)" 'Warn'
+    $installed = Get-AppxPackage -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -like $Pattern -or $_.PackageFullName -like $Pattern }
+  }
+
   foreach ($package in $installed) {
     Write-Status "Removing installed package $($package.Name)"
     try {
       Remove-AppxPackage -Package $package.PackageFullName -AllUsers -ErrorAction Stop
     }
     catch {
-      Remove-AppxPackage -Package $package.PackageFullName -ErrorAction SilentlyContinue
+      try {
+        Remove-AppxPackage -Package $package.PackageFullName -ErrorAction Stop
+      }
+      catch {
+        Write-Status "Skipping installed package $($package.Name): $($_.Exception.Message)" 'Warn'
+      }
     }
   }
 
-  $provisioned = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
-    Where-Object { $_.DisplayName -like $Pattern -or $_.PackageName -like $Pattern }
+  $provisioned = @()
+  try {
+    $provisioned = Get-AppxProvisionedPackage -Online -ErrorAction Stop |
+      Where-Object { $_.DisplayName -like $Pattern -or $_.PackageName -like $Pattern }
+  }
+  catch {
+    Write-Status "Skipping provisioned lookup for $($Pattern): $($_.Exception.Message)" 'Warn'
+  }
+
   foreach ($package in $provisioned) {
     Write-Status "Removing provisioned package $($package.DisplayName)"
-    Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -ErrorAction SilentlyContinue | Out-Null
+    try {
+      Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -ErrorAction Stop | Out-Null
+    }
+    catch {
+      Write-Status "Skipping provisioned package $($package.DisplayName): $($_.Exception.Message)" 'Warn'
+    }
   }
 }
 
@@ -269,20 +339,68 @@ function Disable-MpwareCopilot {
     'HKLM:\Software\Policies\Microsoft\Windows\WindowsCopilot'
   )
   foreach ($key in $keys) {
-    New-Item -Path $key -Force | Out-Null
-    Set-ItemProperty -Path $key -Name 'TurnOffWindowsCopilot' -Type DWord -Value 1 -Force
+    try {
+      New-Item -Path $key -Force | Out-Null
+      Set-ItemProperty -Path $key -Name 'TurnOffWindowsCopilot' -Type DWord -Value 1 -Force
+    }
+    catch {
+      Write-Status "Skipping Copilot policy key $($key): $($_.Exception.Message)" 'Warn'
+    }
   }
 
   $advanced = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-  New-Item -Path $advanced -Force | Out-Null
-  Set-ItemProperty -Path $advanced -Name 'ShowCopilotButton' -Type DWord -Value 0 -Force
+  try {
+    New-Item -Path $advanced -Force | Out-Null
+    Set-ItemProperty -Path $advanced -Name 'ShowCopilotButton' -Type DWord -Value 0 -Force
+  }
+  catch {
+    Write-Status "Skipping Copilot taskbar toggle: $($_.Exception.Message)" 'Warn'
+  }
 
   $bingChat = 'HKLM:\Software\Microsoft\Windows\Shell\Copilot\BingChat'
-  New-Item -Path $bingChat -Force | Out-Null
-  Set-ItemProperty -Path $bingChat -Name 'IsUserEligible' -Type DWord -Value 0 -Force
+  try {
+    New-Item -Path $bingChat -Force | Out-Null
+    Set-ItemProperty -Path $bingChat -Name 'IsUserEligible' -Type DWord -Value 0 -Force
+  }
+  catch {
+    Write-Status "Skipping Copilot BingChat toggle: $($_.Exception.Message)" 'Warn'
+  }
+}
+
+function Remove-MpwareOneDrive {
+  Write-Status 'Removing OneDrive...'
+  Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
+
+  $setupCandidates = @(
+    "$env:SystemRoot\SysWOW64\OneDriveSetup.exe",
+    "$env:SystemRoot\System32\OneDriveSetup.exe"
+  )
+
+  foreach ($setup in $setupCandidates) {
+    if (Test-Path -LiteralPath $setup) {
+      try {
+        $process = Start-Process -FilePath $setup -ArgumentList '/uninstall' -WindowStyle Hidden -Wait -PassThru
+        if ($process.ExitCode -eq 0) {
+          break
+        }
+      }
+      catch {
+        Write-Status "OneDrive uninstall helper failed from $($setup): $($_.Exception.Message)" 'Warn'
+      }
+    }
+  }
+
+  try {
+    New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive' -Force | Out-Null
+    Set-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive' -Name 'DisableFileSyncNGSC' -Type DWord -Value 1 -Force
+  }
+  catch {
+    Write-Status "Skipping OneDrive policy toggle: $($_.Exception.Message)" 'Warn'
+  }
 }
 
 function Invoke-MpwareDebloatPreset {
+  Disable-MpwareConsoleQuickEdit
   $targets = @(
     '*Clipchamp.Clipchamp*',
     '*Microsoft.549981C3F5F10*',
@@ -325,14 +443,35 @@ function Invoke-MpwareDebloatPreset {
 
   Write-Status 'Running recommended debloat preset...'
   Disable-MpwareCopilot
+  Remove-MpwareOneDrive
   foreach ($pattern in ($targets | Sort-Object -Unique)) {
     Remove-MpwareAppxPattern -Pattern $pattern
   }
   Write-Status 'Debloat preset finished. Restart recommended.' 'Success'
 }
 
+function Clear-MpwareEventLogs {
+  $logs = wevtutil.exe el 2>$null
+  foreach ($logName in $logs) {
+    if ([string]::IsNullOrWhiteSpace($logName)) {
+      continue
+    }
+
+    try {
+      $process = Start-Process -FilePath 'wevtutil.exe' -ArgumentList @('cl', $logName) -WindowStyle Hidden -Wait -PassThru
+      if ($process.ExitCode -ne 0) {
+        Write-Status "Skipping event log $logName (exit code $($process.ExitCode))." 'Warn'
+      }
+    }
+    catch {
+      Write-Status "Skipping event log $($logName): $($_.Exception.Message)" 'Warn'
+    }
+  }
+}
+
 function Show-MpwareCleanup {
   $ConfirmPreference = 'None'
+  Disable-MpwareConsoleQuickEdit
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
   [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -402,36 +541,41 @@ function Show-MpwareCleanup {
   }
 
   foreach ($item in $selectedItems) {
-    Write-Status "Cleaning $item"
-    switch ($item) {
-      'User temp files' {
-        Clear-MpwareFolderContents -Path $env:TEMP
+    try {
+      Write-Status "Cleaning $item"
+      switch ($item) {
+        'User temp files' {
+          Clear-MpwareFolderContents -Path $env:TEMP
+        }
+        'Windows temp files' {
+          Clear-MpwareFolderContents -Path "$env:SystemRoot\Temp"
+        }
+        'Recycle Bin' {
+          Clear-RecycleBin -Force -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
+        }
+        'Thumbnail cache' {
+          Remove-Item -Path "$env:LocalAppData\Microsoft\Windows\Explorer\thumbcache_*.db" -Force -Confirm:$false -ErrorAction SilentlyContinue
+        }
+        'DirectX shader cache' {
+          Remove-MpwarePath -Path "$env:LocalAppData\D3DSCache\*"
+        }
+        'NVIDIA shader cache' {
+          Remove-MpwarePath -Path "$env:LocalAppData\NVIDIA\GLCache"
+          Remove-MpwarePath -Path "$env:USERPROFILE\AppData\LocalLow\NVIDIA\PerDriverVersion\DXCache"
+        }
+        'Delivery Optimization cache' {
+          Remove-MpwarePath -Path "$env:SystemRoot\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\*"
+        }
+        'Windows error reports' {
+          Remove-MpwarePath -Path "$env:ProgramData\Microsoft\Windows\WER\*"
+        }
+        'Event Viewer logs' {
+          Clear-MpwareEventLogs
+        }
       }
-      'Windows temp files' {
-        Clear-MpwareFolderContents -Path "$env:SystemRoot\Temp"
-      }
-      'Recycle Bin' {
-        Clear-RecycleBin -Force -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
-      }
-      'Thumbnail cache' {
-        Remove-Item -Path "$env:LocalAppData\Microsoft\Windows\Explorer\thumbcache_*.db" -Force -Confirm:$false -ErrorAction SilentlyContinue
-      }
-      'DirectX shader cache' {
-        Remove-MpwarePath -Path "$env:LocalAppData\D3DSCache\*"
-      }
-      'NVIDIA shader cache' {
-        Remove-MpwarePath -Path "$env:LocalAppData\NVIDIA\GLCache"
-        Remove-MpwarePath -Path "$env:USERPROFILE\AppData\LocalLow\NVIDIA\PerDriverVersion\DXCache"
-      }
-      'Delivery Optimization cache' {
-        Remove-MpwarePath -Path "$env:SystemRoot\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\*"
-      }
-      'Windows error reports' {
-        Remove-MpwarePath -Path "$env:ProgramData\Microsoft\Windows\WER\*"
-      }
-      'Event Viewer logs' {
-        wevtutil el | ForEach-Object { wevtutil cl "$_" 2>$null | Out-Null }
-      }
+    }
+    catch {
+      Write-Status "Skipping cleanup target $($item): $($_.Exception.Message)" 'Warn'
     }
   }
   Write-Status 'Cleanup finished.' 'Success'
