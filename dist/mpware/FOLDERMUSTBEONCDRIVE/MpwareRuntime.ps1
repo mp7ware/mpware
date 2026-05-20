@@ -88,6 +88,134 @@ function Custom-MsgBox {
   return 'Cancel'
 }
 
+function Test-MpwareWinget {
+  return [bool](Get-Command winget.exe -ErrorAction SilentlyContinue)
+}
+
+function Open-MpwareUrl {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Url,
+    [Parameter(Mandatory = $true)]
+    [string]$Label
+  )
+
+  Write-Status "Opening $Label download page..."
+  Start-Process $Url | Out-Null
+  Write-Status "$Label page opened in your browser." 'Success'
+}
+
+function Invoke-MpwareWingetInstall {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Id,
+    [Parameter(Mandatory = $true)]
+    [string]$DisplayName,
+    [string]$FallbackUrl
+  )
+
+  if (-not (Check-Internet)) {
+    throw "Internet connection is required to install $DisplayName."
+  }
+
+  if (-not (Test-MpwareWinget)) {
+    if ($FallbackUrl) {
+      Write-Status "winget is not available. Opening the official $DisplayName download page instead." 'Warn'
+      Open-MpwareUrl -Url $FallbackUrl -Label $DisplayName
+      return
+    }
+    throw "winget is required to install $DisplayName on this PC."
+  }
+
+  Write-Status "Installing $DisplayName with winget..."
+  & winget install --id $Id -e --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity
+  if ($LASTEXITCODE -ne 0) {
+    throw "winget install failed for $DisplayName (exit code $LASTEXITCODE)."
+  }
+  Write-Status "$DisplayName install finished." 'Success'
+}
+
+function Install-MpwareBrowser {
+  param(
+    [ValidateSet('Brave', 'Firefox', 'Chrome')]
+    [string]$Name
+  )
+
+  $targets = @{
+    Brave = @{
+      Id = 'Brave.Brave'
+      Url = 'https://brave.com/download/'
+    }
+    Firefox = @{
+      Id = 'Mozilla.Firefox'
+      Url = 'https://www.mozilla.org/firefox/new/'
+    }
+    Chrome = @{
+      Id = 'Google.Chrome.EXE'
+      Url = 'https://www.google.com/chrome/'
+    }
+  }
+
+  $target = $targets[$Name]
+  Invoke-MpwareWingetInstall -Id $target.Id -DisplayName $Name -FallbackUrl $target.Url
+}
+
+function Install-MpwareProgram {
+  param(
+    [ValidateSet('NVIDIA App', 'Steam', 'Discord')]
+    [string]$Name
+  )
+
+  switch ($Name) {
+    'NVIDIA App' {
+      if (-not (Check-Internet)) {
+        throw 'Internet connection is required to download NVIDIA App.'
+      }
+      Open-MpwareUrl -Url 'https://www.nvidia.com/en-us/software/nvidia-app/' -Label 'NVIDIA App'
+      return
+    }
+    'Steam' {
+      Invoke-MpwareWingetInstall -Id 'Valve.Steam' -DisplayName 'Steam' -FallbackUrl 'https://store.steampowered.com/about/'
+      return
+    }
+    'Discord' {
+      Invoke-MpwareWingetInstall -Id 'Discord.Discord' -DisplayName 'Discord' -FallbackUrl 'https://discord.com/download'
+      return
+    }
+  }
+}
+
+function Install-MpwarePackages {
+  $packages = @(
+    @{
+      Id = 'Microsoft.VCRedist.2015+.x64'
+      Name = 'Microsoft Visual C++ Redistributable (x64)'
+      Url = 'https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170'
+    }
+    @{
+      Id = 'Microsoft.VCRedist.2015+.x86'
+      Name = 'Microsoft Visual C++ Redistributable (x86)'
+      Url = 'https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170'
+    }
+    @{
+      Id = 'Microsoft.DotNet.DesktopRuntime.8'
+      Name = '.NET Desktop Runtime 8'
+      Url = 'https://dotnet.microsoft.com/en-us/download/dotnet/8.0'
+    }
+    @{
+      Id = 'Microsoft.DirectX'
+      Name = 'DirectX End-User Runtime'
+      Url = 'https://www.microsoft.com/en-us/download/details.aspx?id=35'
+    }
+  )
+
+  Write-Status 'Installing package bundle: VC++ redistributables, .NET Desktop Runtime 8, and DirectX...'
+  foreach ($package in $packages) {
+    Invoke-MpwareWingetInstall -Id $package.Id -DisplayName $package.Name -FallbackUrl $package.Url
+  }
+  Write-Status 'Package bundle finished.' 'Success'
+}
+
 function Remove-MpwareAppxPattern {
   param([string]$Pattern)
 

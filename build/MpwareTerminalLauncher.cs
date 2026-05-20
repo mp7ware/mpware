@@ -100,6 +100,7 @@ namespace mpwareLauncher
             dock.Children.Add(nav);
             nav.Children.Add(NavButton("Registry Tweaks", ShowRegistryTweaks));
             nav.Children.Add(NavButton("NVIDIA Driver", ShowNvidiaDriver));
+            nav.Children.Add(NavButton("Programs", ShowPrograms));
             nav.Children.Add(NavButton("Debloater", ShowDebloater));
             nav.Children.Add(NavButton("Cleanup", ShowCleanup));
             nav.Children.Add(NavButton("Restore Tweaks", ShowRestoreTweaks));
@@ -342,6 +343,57 @@ namespace mpwareLauncher
             RefreshNav();
         }
 
+        private void ShowPrograms(object sender, RoutedEventArgs e)
+        {
+            StackPanel page = BeginPage("PROGRAMS", "Install browsers, everyday apps, and common Windows runtimes from one place.", 860);
+
+            Border browsers = Box(_border);
+            browsers.Margin = new Thickness(0, 0, 0, 18);
+            page.Children.Add(browsers);
+
+            StackPanel browserStack = new StackPanel { Margin = new Thickness(24) };
+            browsers.Child = browserStack;
+            browserStack.Children.Add(SectionTitle("BROWSERS", "Installs with winget when available. If winget is missing, mpware opens the official download page instead."));
+            browserStack.Children.Add(InfoLine("Brave, Firefox, and Chrome are installed individually so you can pick only what you want."));
+            browserStack.Children.Add(BuildProgramsRow(new Button[]
+            {
+                InstallCommandButton("INSTALL BRAVE", "Install-MpwareBrowser -Name 'Brave'"),
+                InstallCommandButton("INSTALL FIREFOX", "Install-MpwareBrowser -Name 'Firefox'"),
+                InstallCommandButton("INSTALL CHROME", "Install-MpwareBrowser -Name 'Chrome'")
+            }));
+
+            Border apps = Box(_border);
+            apps.Margin = new Thickness(0, 0, 0, 18);
+            page.Children.Add(apps);
+
+            StackPanel appStack = new StackPanel { Margin = new Thickness(24) };
+            apps.Child = appStack;
+            appStack.Children.Add(SectionTitle("APPS", "Install common desktop apps directly, or open the official vendor page when a direct package is not reliable."));
+            appStack.Children.Add(InfoLine("NVIDIA App currently opens the official NVIDIA page. Steam and Discord use winget with official-site fallback."));
+            appStack.Children.Add(BuildProgramsRow(new Button[]
+            {
+                InstallCommandButton("NVIDIA APP", "Install-MpwareProgram -Name 'NVIDIA App'"),
+                InstallCommandButton("INSTALL STEAM", "Install-MpwareProgram -Name 'Steam'"),
+                InstallCommandButton("INSTALL DISCORD", "Install-MpwareProgram -Name 'Discord'")
+            }));
+
+            Border runtimes = Box(_border);
+            page.Children.Add(runtimes);
+
+            StackPanel runtimeStack = new StackPanel { Margin = new Thickness(24) };
+            runtimes.Child = runtimeStack;
+            runtimeStack.Children.Add(SectionTitle("PACKAGES", "Installs the usual Windows support runtimes in one pass."));
+            runtimeStack.Children.Add(InfoLine("Bundle includes VC++ 2015+ x64/x86, .NET Desktop Runtime 8, and DirectX End-User Runtime."));
+
+            Button packageButton = InstallCommandButton("INSTALL VCREDIST + NETRUNTIME + DIRECTX", "Install-MpwarePackages");
+            packageButton.Height = 42;
+            packageButton.Margin = new Thickness(0, 22, 0, 0);
+            packageButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+            runtimeStack.Children.Add(packageButton);
+
+            RefreshNav();
+        }
+
         private void ShowDebloater(object sender, RoutedEventArgs e)
         {
             StackPanel page = BeginPage("WINDOWS DEBLOATER", "Simple presets for removing bundled Windows apps.", 820);
@@ -438,6 +490,35 @@ namespace mpwareLauncher
             Button run = ActionButton("RUN", delegate { RunFunctionWithVisibleConsole(functionCall); }, true);
             run.HorizontalAlignment = HorizontalAlignment.Stretch;
             stack.Children.Add(run);
+        }
+
+        private Grid BuildProgramsRow(Button[] buttons)
+        {
+            System.Windows.Controls.Primitives.UniformGrid grid = new System.Windows.Controls.Primitives.UniformGrid();
+            grid.Columns = buttons.Length;
+            grid.Margin = new Thickness(0, 20, 0, 0);
+
+            foreach (Button button in buttons)
+            {
+                button.Margin = new Thickness(0, 0, 10, 0);
+                button.Height = 40;
+                button.HorizontalAlignment = HorizontalAlignment.Stretch;
+                grid.Children.Add(button);
+            }
+
+            if (buttons.Length > 0)
+            {
+                buttons[buttons.Length - 1].Margin = new Thickness(0);
+            }
+
+            Grid host = new Grid();
+            host.Children.Add(grid);
+            return host;
+        }
+
+        private Button InstallCommandButton(string text, string functionCall)
+        {
+            return ActionButton(text, delegate { RunFunctionWithVisibleConsole(functionCall); }, true);
         }
 
         private void ShowAbout(object sender, RoutedEventArgs e)
