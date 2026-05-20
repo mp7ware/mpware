@@ -65,7 +65,8 @@ public static class ConsoleMode {
     if ([MpwareNative.ConsoleMode]::GetConsoleMode($stdinHandle, [ref]$mode)) {
       $ENABLE_EXTENDED_FLAGS = 0x0080
       $ENABLE_QUICK_EDIT = 0x0040
-      $updatedMode = ($mode -bor $ENABLE_EXTENDED_FLAGS) -band (-bnot $ENABLE_QUICK_EDIT)
+      $ENABLE_INSERT_MODE = 0x0020
+      $updatedMode = (($mode -bor $ENABLE_EXTENDED_FLAGS) -band (-bnot $ENABLE_QUICK_EDIT)) -band (-bnot $ENABLE_INSERT_MODE)
       [MpwareNative.ConsoleMode]::SetConsoleMode($stdinHandle, $updatedMode) | Out-Null
     }
   }
@@ -451,21 +452,35 @@ function Invoke-MpwareDebloatPreset {
 }
 
 function Clear-MpwareEventLogs {
-  $logs = wevtutil.exe el 2>$null
+  $logs = @(wevtutil.exe el 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+  $cleared = 0
+  $skipped = 0
+
   foreach ($logName in $logs) {
-    if ([string]::IsNullOrWhiteSpace($logName)) {
+    if ($logName -match '/Analytic$' -or $logName -match '/Debug$') {
+      $skipped++
       continue
     }
 
     try {
       $process = Start-Process -FilePath 'wevtutil.exe' -ArgumentList @('cl', $logName) -WindowStyle Hidden -Wait -PassThru
-      if ($process.ExitCode -ne 0) {
-        Write-Status "Skipping event log $logName (exit code $($process.ExitCode))." 'Warn'
+      if ($process.ExitCode -eq 0) {
+        $cleared++
+      }
+      else {
+        $skipped++
       }
     }
     catch {
-      Write-Status "Skipping event log $($logName): $($_.Exception.Message)" 'Warn'
+      $skipped++
     }
+  }
+
+  if ($cleared -gt 0) {
+    Write-Status "Cleared $cleared Event Viewer log channel(s)." 'Success'
+  }
+  if ($skipped -gt 0) {
+    Write-Status "Skipped $skipped unsupported or protected Event Viewer channel(s)." 'Warn'
   }
 }
 
