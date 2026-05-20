@@ -193,10 +193,35 @@ namespace mpwareLauncher
             buttons.Children.Add(ActionButton("SELECT ALL", delegate { SelectAllTweaks(); }, false));
             buttons.Children.Add(ActionButton("EXPORT .REG", ExportSelectedReg, false));
 
+            Border listBox = Box(_border);
+            page.Children.Add(listBox);
+
+            StackPanel listHost = new StackPanel();
+            listBox.Child = listHost;
+
+            Button toggleTweaks = FlatButton("> SHOW TWEAK LIST", false);
+            toggleTweaks.Height = 36;
+            toggleTweaks.HorizontalContentAlignment = HorizontalAlignment.Left;
+            toggleTweaks.Padding = new Thickness(14, 0, 14, 0);
+            toggleTweaks.Margin = new Thickness(12, 12, 12, 8);
+            listHost.Children.Add(toggleTweaks);
+
+            StackPanel tweakList = new StackPanel();
+            tweakList.Margin = new Thickness(12, 0, 12, 12);
+            tweakList.Visibility = Visibility.Collapsed;
+            listHost.Children.Add(tweakList);
+
             foreach (TweakItem tweak in OrderedTweaks())
             {
-                page.Children.Add(TweakCard(tweak));
+                tweakList.Children.Add(TweakCard(tweak));
             }
+
+            toggleTweaks.Click += delegate
+            {
+                bool expanded = tweakList.Visibility == Visibility.Visible;
+                tweakList.Visibility = expanded ? Visibility.Collapsed : Visibility.Visible;
+                toggleTweaks.Content = expanded ? "> SHOW TWEAK LIST" : "v HIDE TWEAK LIST";
+            };
 
             UpdateSelectedCount();
             RefreshNav();
