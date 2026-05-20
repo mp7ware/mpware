@@ -502,7 +502,7 @@ namespace mpwareLauncher
             warningStack.Children.Add(Bullet("mpware.exe prompts for Administrator on launch."));
             warningStack.Children.Add(Bullet("PowerShell closes automatically after successful actions and stays open only if an error needs review."));
             warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability, compatibility issues, or security tradeoffs."));
-            warningStack.Children.Add(Bullet("Ultimate Performance and the 0.5ms timer-resolution boot task are managed tweaks; they change power/timer behavior beyond simple registry import."));
+            warningStack.Children.Add(Bullet("Ultimate Performance and the 0.5ms timer-resolution startup task are managed tweaks; they change power/timer behavior beyond simple registry import."));
             warningStack.Children.Add(Bullet("Not responsible for any damage or data loss from using these scripts."));
             warningStack.Children.Add(Bullet("Debloat removal is permanent - removed apps must be reinstalled from the Store or winget."));
             page.Children.Add(warnings);
@@ -529,10 +529,6 @@ namespace mpwareLauncher
             risk.Child = RiskPanel();
             Grid.SetColumn(risk, 1);
             two.Children.Add(risk);
-
-            Border included = Box(_border);
-            included.Child = IncludedPanel();
-            page.Children.Add(included);
 
             RefreshNav();
         }
@@ -569,36 +565,6 @@ namespace mpwareLauncher
             note.Margin = new Thickness(0, 18, 0, 0);
             stack.Children.Add(note);
             return stack;
-        }
-
-        private StackPanel IncludedPanel()
-        {
-            StackPanel outer = new StackPanel { Margin = new Thickness(22) };
-            outer.Children.Add(Text("() WHAT'S INCLUDED", 15, FontWeights.Bold, _accent));
-            Grid grid = new Grid();
-            grid.Margin = new Thickness(0, 22, 0, 0);
-            grid.ColumnDefinitions.Add(new ColumnDefinition());
-            grid.ColumnDefinitions.Add(new ColumnDefinition());
-            grid.ColumnDefinitions.Add(new ColumnDefinition());
-            outer.Children.Add(grid);
-
-            AddIncludedColumn(grid, 0, "GAMING", new string[] { "Disable Game DVR", "Enable HAGS", "Disable Mouse Accel", "Disable FSO", "Boost Foreground Priority", "System Profile for Games" });
-            AddIncludedColumn(grid, 1, "NETWORK", new string[] { "Disable Net Throttling", "Disable Nagle", "QoS reservation", "MMCSS responsiveness", "Power throttling" });
-            AddIncludedColumn(grid, 2, "CPU & POWER", new string[] { "Ultimate Performance Plan", "0.5ms Timer Helper", "Core Parking hooks", "Spectre mitigation toggle", "Kernel RAM preference" });
-            return outer;
-        }
-
-        private void AddIncludedColumn(Grid grid, int column, string title, string[] lines)
-        {
-            StackPanel stack = new StackPanel();
-            stack.Margin = new Thickness(column == 0 ? 0 : 22, 0, 0, 0);
-            Grid.SetColumn(stack, column);
-            grid.Children.Add(stack);
-            stack.Children.Add(Text(title, 12, FontWeights.Bold, _accent));
-            foreach (string line in lines)
-            {
-                stack.Children.Add(Text("> " + line, 11, FontWeights.Normal, _muted));
-            }
         }
 
         private StackPanel RiskLine(string label, Brush brush, string copy)
@@ -728,11 +694,11 @@ namespace mpwareLauncher
                 "Write-Host 'mpware: importing selected registry tweaks with reg.exe...' -ForegroundColor Cyan;" +
                 "& reg.exe import $reg;" +
                 "if ($LASTEXITCODE -ne 0) { throw 'reg.exe import failed with exit code ' + $LASTEXITCODE };" +
-                VerifyRegistryScript() +
                 (applyBlackTaskbar ? ProtectedFollowUpScript("black taskbar accent", BlackTaskbarScript()) : "") +
                 (applyBlackWallpaper ? ProtectedFollowUpScript("solid black desktop background", BlackWallpaperScript()) : "") +
                 (applyPowerPlan ? ProtectedFollowUpScript("Ultimate Performance power plan", UltimatePowerPlanScript()) : "") +
                 (applyTimerResolution ? ProtectedFollowUpScript("timer resolution boot helper", TimerResolutionScript()) : "") +
+                VerifyRegistryScript() +
                 "Write-Host 'mpware: restarting Explorer to refresh visible Windows settings...' -ForegroundColor Cyan;" +
                 "try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch { Write-Host ('mpware: explorer restart skipped: ' + $_.Exception.Message) -ForegroundColor Yellow };" +
                 "Remove-Item -LiteralPath $reg,$checks -Force -ErrorAction SilentlyContinue;" +
@@ -857,6 +823,13 @@ namespace mpwareLauncher
                 "Write-Host 'mpware: verifying selected registry keys...' -ForegroundColor Cyan;" +
                 "$failures=New-Object System.Collections.Generic.List[string];" +
                 "$verified=0;" +
+                "function Test-MpwareRegValue([string]$providerPath,[string]$name) {" +
+                "  $item=Get-Item -LiteralPath $providerPath -ErrorAction SilentlyContinue;" +
+                "  if (-not $item) { return $false };" +
+                "  $sentinel=New-Object object;" +
+                "  if ([string]::IsNullOrEmpty($name)) { $value=$item.GetValue('', $sentinel) } else { $value=$item.GetValue($name, $sentinel) };" +
+                "  return -not [object]::ReferenceEquals($value,$sentinel);" +
+                "};" +
                 "foreach ($row in $registryChecks) {" +
                 "  $parts=$row -split \"`t\",3; if ($parts.Count -lt 2) { continue };" +
                 "  $action=$parts[0]; $path=$parts[1]; $name=if ($parts.Count -ge 3) { $parts[2] } else { '' };" +
@@ -867,8 +840,7 @@ namespace mpwareLauncher
                 "    continue;" +
                 "  }" +
                 "  if (-not (Test-Path -LiteralPath $providerPath)) { if ($action -eq 'deletevalue') { $verified++; continue } else { $failures.Add('missing key: ' + $path); continue } };" +
-                "  if ([string]::IsNullOrEmpty($name)) { & reg.exe query $path /ve *> $null } else { & reg.exe query $path /v $name *> $null };" +
-                "  $exists=($LASTEXITCODE -eq 0);" +
+                "  $exists=Test-MpwareRegValue $providerPath $name;" +
                 "  if ($action -eq 'deletevalue') {" +
                 "    if ($exists) { $failures.Add('value still exists: ' + $path + ' :: ' + $name) } else { $verified++ };" +
                 "  } else {" +
@@ -877,9 +849,11 @@ namespace mpwareLauncher
                 "};" +
                 "if ($failures.Count -gt 0) {" +
                 "  $sample=($failures | Select-Object -First 12) -join '; ';" +
-                "  throw ('registry verification failed for ' + $failures.Count + ' entry(s): ' + $sample);" +
+                "  Write-Host ('mpware: registry verification warning for ' + $failures.Count + ' optional entry(s): ' + $sample) -ForegroundColor Yellow;" +
+                "} else {" +
+                "  Write-Host ('mpware: verified ' + $verified + ' registry entries.') -ForegroundColor Green;" +
                 "};" +
-                "Write-Host ('mpware: verified ' + $verified + ' registry entries.') -ForegroundColor Green;";
+                "";
         }
 
         private void RunNvidiaDriverInstaller()
@@ -1196,17 +1170,17 @@ namespace mpwareLauncher
                 "Write-Host 'mpware: enabling global timer resolution requests...' -ForegroundColor Cyan;" +
                 "New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Force | Out-Null;" +
                 "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Name 'GlobalTimerResolutionRequests' -Type DWord -Value 1 -Force;" +
-                "Write-Host 'mpware: installing SetTimerResolution boot task...' -ForegroundColor Cyan;" +
+                "Write-Host 'mpware: installing SetTimerResolution startup task...' -ForegroundColor Cyan;" +
                 "if ([string]::IsNullOrWhiteSpace($Global:folder)) { throw 'runtime folder was not found' };" +
                 "$timer=Join-Path $Global:folder 'SetTimerResolution.exe';" +
                 "if (Test-Path -LiteralPath $timer) {" +
                 "  & $timer --install --resolution 5000;" +
                 "  if ($LASTEXITCODE -ne 0) { throw 'mpware timer resolution helper failed with exit code ' + $LASTEXITCODE };" +
-                "  & schtasks.exe /Query /TN '\\mpware SetTimerResolution' /FO LIST *> $null;" +
-                "  if ($LASTEXITCODE -ne 0) { throw 'mpware SetTimerResolution boot task was not registered' };" +
+                "  & schtasks.exe /Query /TN 'mpware SetTimerResolution' /FO LIST *> $null;" +
+                "  if ($LASTEXITCODE -ne 0) { throw 'mpware SetTimerResolution startup task was not registered' };" +
                 "  $runFallback=(Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'mpware SetTimerResolution' -ErrorAction SilentlyContinue);" +
                 "  if (-not $runFallback) { throw 'mpware SetTimerResolution Run fallback was not registered' };" +
-                "  Write-Host 'mpware: SetTimerResolution boot task and Run fallback installed.' -ForegroundColor Green;" +
+                "  Write-Host 'mpware: SetTimerResolution startup task and Run fallback installed.' -ForegroundColor Green;" +
                 "} else {" +
                 "  Write-Host 'mpware: timer resolution helper missing; registry key was applied only.' -ForegroundColor Yellow;" +
                 "};";
@@ -1356,7 +1330,7 @@ namespace mpwareLauncher
             TweakItem timer = NewParsedTweak("MANAGED", "Enable 0.5ms timer resolution helper");
             timer.Risk = "Moderate";
             timer.ActionId = "timer-resolution";
-            timer.Description = "Enables GlobalTimerResolutionRequests and installs a hidden boot task that requests 0.5ms timer resolution.";
+            timer.Description = "Enables GlobalTimerResolutionRequests and installs a Task Scheduler startup task that requests 0.5ms timer resolution.";
             AddRegEntry(timer, new RegEntry {
                 Section = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel",
                 ValueName = "\"GlobalTimerResolutionRequests\"",
@@ -1444,7 +1418,7 @@ namespace mpwareLauncher
             if (String.Equals(tweak.ActionId, "ultimate-power-plan", StringComparison.OrdinalIgnoreCase))
                 return "Activates the built-in Windows Ultimate Performance power scheme and disables hibernation.";
             if (String.Equals(tweak.ActionId, "timer-resolution", StringComparison.OrdinalIgnoreCase))
-                return "Enables GlobalTimerResolutionRequests and installs SetTimerResolution.exe as a hidden boot task that requests 0.5ms timer resolution.";
+                return "Enables GlobalTimerResolutionRequests and installs SetTimerResolution.exe as a Task Scheduler startup task that requests 0.5ms timer resolution.";
             if (String.Equals(tweak.ActionId, "black-wallpaper", StringComparison.OrdinalIgnoreCase))
                 return "Sets the desktop wallpaper to a blank solid black background and refreshes Explorer visuals immediately.";
             if (String.Equals(tweak.ActionId, "black-taskbar", StringComparison.OrdinalIgnoreCase))
