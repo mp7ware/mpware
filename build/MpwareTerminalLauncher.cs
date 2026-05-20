@@ -849,7 +849,10 @@ namespace mpwareLauncher
                 "    if ([string]::IsNullOrWhiteSpace($path)) { continue };" +
                 "    $providerPath='Registry::' + $path;" +
                 "    if (Test-Path -LiteralPath $providerPath) {" +
-                "      Remove-Item -LiteralPath $providerPath -Recurse -Force -ErrorAction Stop;" +
+                "      $null = & reg.exe delete $path /f 2>&1;" +
+                "      if ($LASTEXITCODE -ne 0 -and (Test-Path -LiteralPath $providerPath)) {" +
+                "        Write-Host ('mpware: could not remove registry key: ' + $path) -ForegroundColor Yellow;" +
+                "      }" +
                 "    }" +
                 "  }" +
                 "};";
@@ -901,7 +904,7 @@ namespace mpwareLauncher
             string escapedTempScript = PsEscape(tempScript);
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = "powershell.exe";
-            psi.Arguments = "-NoProfile -Command \"& { $path='" + escapedTempScript + "'; $content=[System.IO.File]::ReadAllText($path); [ScriptBlock]::Create($content).Invoke() }\"";
+            psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"& { $path='" + escapedTempScript + "'; $content=[System.IO.File]::ReadAllText($path); [ScriptBlock]::Create($content).Invoke() }\"";
             if (!String.IsNullOrWhiteSpace(_runtimeRoot))
             {
                 psi.WorkingDirectory = _runtimeRoot;
