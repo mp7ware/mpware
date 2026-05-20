@@ -729,8 +729,9 @@ namespace mpwareLauncher
                 RestorePointScript("registry tweaks") +
                 RegistryDeleteScript() +
                 "Write-Host 'mpware: importing selected registry tweaks with reg.exe...' -ForegroundColor Cyan;" +
-                "& reg.exe import $reg;" +
-                "if ($LASTEXITCODE -ne 0) { throw 'reg.exe import failed with exit code ' + $LASTEXITCODE };" +
+                "$regExe=Join-Path $env:SystemRoot 'System32\\reg.exe';" +
+                "$regProc=Start-Process -FilePath $regExe -ArgumentList @('import',$reg) -Wait -PassThru -WindowStyle Hidden;" +
+                "if ($regProc.ExitCode -ne 0) { throw 'reg.exe import failed with exit code ' + $regProc.ExitCode };" +
                 (applyBlackTaskbar ? ProtectedFollowUpScript("black taskbar accent", BlackTaskbarScript()) : "") +
                 (applyBlackWallpaper ? ProtectedFollowUpScript("solid black desktop background", BlackWallpaperScript()) : "") +
                 (applyPowerPlan ? ProtectedFollowUpScript("bundled mpware powerplan", UltimatePowerPlanScript()) : "") +
@@ -1207,16 +1208,27 @@ namespace mpwareLauncher
         {
             return
                 "Write-Host 'mpware: clearing Start menu pinned apps...' -ForegroundColor Cyan;" +
-                "$json='{\"pinnedList\":[]}' ;" +
+                "$json='{\"pinnedList\":[],\"applyOnce\":false}';" +
                 "$userPolicy='HKCU:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer';" +
-                "$devicePolicy='HKLM:\\SOFTWARE\\Microsoft\\PolicyManager\\current\\device\\Start';" +
-                "New-Item -Path $userPolicy,$devicePolicy -Force | Out-Null;" +
+                "$machinePolicy='HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer';" +
+                "$userCurrent='HKCU:\\SOFTWARE\\Microsoft\\PolicyManager\\current\\user\\Start';" +
+                "$deviceCurrent='HKLM:\\SOFTWARE\\Microsoft\\PolicyManager\\current\\device\\Start';" +
+                "New-Item -Path $userPolicy,$machinePolicy,$userCurrent,$deviceCurrent -Force | Out-Null;" +
                 "Set-ItemProperty -Path $userPolicy -Name 'ConfigureStartPins' -Type String -Value $json -Force;" +
-                "Set-ItemProperty -Path $devicePolicy -Name 'ConfigureStartPins' -Type String -Value $json -Force;" +
-                "Set-ItemProperty -Path $devicePolicy -Name 'ConfigureStartPins_ProviderSet' -Type DWord -Value 1 -Force;" +
+                "Set-ItemProperty -Path $machinePolicy -Name 'ConfigureStartPins' -Type String -Value $json -Force;" +
+                "Set-ItemProperty -Path $userCurrent -Name 'ConfigureStartPins' -Type String -Value $json -Force;" +
+                "Set-ItemProperty -Path $userCurrent -Name 'ConfigureStartPins_ProviderSet' -Type DWord -Value 1 -Force;" +
+                "Set-ItemProperty -Path $deviceCurrent -Name 'ConfigureStartPins' -Type String -Value $json -Force;" +
+                "Set-ItemProperty -Path $deviceCurrent -Name 'ConfigureStartPins_ProviderSet' -Type DWord -Value 1 -Force;" +
+                "$shellPath=Join-Path $env:LOCALAPPDATA 'Microsoft\\Windows\\Shell';" +
+                "New-Item -ItemType Directory -Path $shellPath -Force | Out-Null;" +
+                "[System.IO.File]::WriteAllText((Join-Path $shellPath 'LayoutModification.json'), $json, [System.Text.UTF8Encoding]::new($false));" +
                 "try { Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue } catch {};" +
                 "$startState=Join-Path $env:LOCALAPPDATA 'Packages\\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\\LocalState';" +
-                "if (Test-Path -LiteralPath $startState) { Get-ChildItem -LiteralPath $startState -Filter 'start*.bin' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue };";
+                "if (Test-Path -LiteralPath $startState) {" +
+                "  Get-ChildItem -LiteralPath $startState -Filter 'start*.bin' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue;" +
+                "  Get-ChildItem -LiteralPath $startState -Filter '*.db' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue;" +
+                "};";
         }
 
         private string ProtectedFollowUpScript(string label, string script)
