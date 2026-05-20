@@ -166,14 +166,14 @@ namespace mpwareLauncher
 
         private void ShowRegistryTweaks()
         {
-            StackPanel page = BeginPage("REGISTRY TWEAKS", "Select, inspect, export, or apply registry groups.", 1040);
+            StackPanel page = BeginPage("REGISTRY TWEAKS", "Choose the tweaks you want, review the paths, then export or apply them.", 1040);
 
             Border promptBox = Box(_borderDim);
             promptBox.Margin = new Thickness(0, 0, 0, 18);
             StackPanel promptStack = new StackPanel { Margin = new Thickness(14, 10, 14, 10) };
             promptBox.Child = promptStack;
-            promptStack.Children.Add(Text("> mpware.exe launches as Administrator and opens a progress log while applying changes.", 11, FontWeights.Bold, _accent));
-            promptStack.Children.Add(Text("  Selected tweaks create a restore point first, import the chosen registry values, skip already-missing delete targets, and verify the entries afterward.", 11, FontWeights.Normal, _muted));
+            promptStack.Children.Add(Text("> mpware runs as Administrator and shows a progress log while changes are applied.", 11, FontWeights.Bold, _accent));
+            promptStack.Children.Add(Text("  Registry Tweaks create a restore point first, import the selected values, run any required follow-up steps, and verify the result afterward.", 11, FontWeights.Normal, _muted));
             page.Children.Add(promptBox);
 
             Grid actions = new Grid();
@@ -239,7 +239,7 @@ namespace mpwareLauncher
             path.Margin = new Thickness(14, 0, 0, 0);
             path.HorizontalAlignment = HorizontalAlignment.Right;
             path.VerticalAlignment = VerticalAlignment.Center;
-            path.ToolTip = "Click to show full registry paths, values, and descriptions.";
+            path.ToolTip = "Show the full registry path, value, and what the tweak changes.";
             path.Click += delegate { ShowRegistryPatch(tweak); };
             Grid.SetColumn(path, 2);
             grid.Children.Add(path);
@@ -321,17 +321,17 @@ namespace mpwareLauncher
 
         private void ShowGpuDriver(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("GPU DRIVER", "Driver install and vendor settings helpers.", 760);
+            StackPanel page = BeginPage("GPU DRIVER", "Open the bundled driver and vendor tools from one place.", 760);
 
             Border box = Box(_border);
             page.Children.Add(box);
 
             StackPanel stack = new StackPanel { Margin = new Thickness(28) };
             box.Child = stack;
-            stack.Children.Add(SectionTitle("GPU TOOLS", "Launch the bundled driver and settings scripts from one place."));
+            stack.Children.Add(SectionTitle("GPU TOOLS", "Run the included driver and vendor settings scripts."));
             stack.Children.Add(InfoLine("Requires administrator approval."));
-            stack.Children.Add(InfoLine("Install GPU Drivers opens the supplied driver install script so you can choose NVIDIA, AMD, or Intel."));
-            stack.Children.Add(InfoLine("NVIDIA Settings and AMD Settings launch the supplied vendor tuning scripts in a matching mpware console style."));
+            stack.Children.Add(InfoLine("Install GPU Drivers opens the bundled setup script so you can choose NVIDIA, AMD, or Intel."));
+            stack.Children.Add(InfoLine("NVIDIA Settings and AMD Settings open the included vendor tuning scripts in the same mpware console style."));
 
             StackPanel buttons = new StackPanel();
             buttons.Margin = new Thickness(0, 24, 0, 0);
@@ -359,7 +359,7 @@ namespace mpwareLauncher
 
         private void ShowPrograms(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("PROGRAMS", "Install browsers, everyday apps, and common Windows runtimes from one place.", 860);
+            StackPanel page = BeginPage("PROGRAMS", "Install browsers, common apps, and Windows runtimes from one screen.", 860);
 
             Border browsers = Box(_border);
             browsers.Margin = new Thickness(0, 0, 0, 18);
@@ -367,8 +367,8 @@ namespace mpwareLauncher
 
             StackPanel browserStack = new StackPanel { Margin = new Thickness(24) };
             browsers.Child = browserStack;
-            browserStack.Children.Add(SectionTitle("BROWSERS", "Installs with winget when available. If winget is missing, mpware opens the official download page instead."));
-            browserStack.Children.Add(InfoLine("Brave, Firefox, and Chrome are installed individually so you can pick only what you want."));
+            browserStack.Children.Add(SectionTitle("BROWSERS", "Uses winget when it is available. If it is not, mpware opens the official download page."));
+            browserStack.Children.Add(InfoLine("Each browser installs separately so you can keep the setup simple."));
             browserStack.Children.Add(BuildProgramsRow(new Button[]
             {
                 InstallCommandButton("INSTALL BRAVE", "Install-MpwareBrowser -Name 'Brave'"),
@@ -382,8 +382,8 @@ namespace mpwareLauncher
 
             StackPanel appStack = new StackPanel { Margin = new Thickness(24) };
             apps.Child = appStack;
-            appStack.Children.Add(SectionTitle("APPS", "Install common desktop apps directly, or open the official vendor page when a direct package is not reliable."));
-            appStack.Children.Add(InfoLine("NVIDIA App currently opens the official NVIDIA page. Steam and Discord use winget with official-site fallback."));
+            appStack.Children.Add(SectionTitle("APPS", "Install a few common desktop apps or open the official vendor page when needed."));
+            appStack.Children.Add(InfoLine("NVIDIA App opens the official NVIDIA page. Steam and Discord use winget with an official-site fallback."));
             appStack.Children.Add(BuildProgramsRow(new Button[]
             {
                 InstallCommandButton("NVIDIA APP", "Install-MpwareProgram -Name 'NVIDIA App'"),
@@ -396,8 +396,8 @@ namespace mpwareLauncher
 
             StackPanel runtimeStack = new StackPanel { Margin = new Thickness(24) };
             runtimes.Child = runtimeStack;
-            runtimeStack.Children.Add(SectionTitle("PACKAGES", "Installs the usual Windows support runtimes in one pass."));
-            runtimeStack.Children.Add(InfoLine("Bundle includes VC++ 2015+ x64/x86, .NET Desktop Runtime 8, and DirectX End-User Runtime."));
+            runtimeStack.Children.Add(SectionTitle("PACKAGES", "Install the common Windows support runtimes in one pass."));
+            runtimeStack.Children.Add(InfoLine("Includes VC++ 2015+ x64/x86, .NET Desktop Runtime 8, and the DirectX End-User Runtime."));
 
             Button packageButton = InstallCommandButton("INSTALL VCREDIST + NETRUNTIME + DIRECTX", "Install-MpwarePackages");
             packageButton.Height = 42;
@@ -410,14 +410,14 @@ namespace mpwareLauncher
 
         private void ShowDebloater(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("WINDOWS DEBLOATER", "One recommended preset for removing bundled Windows apps.", 820);
+            StackPanel page = BeginPage("WINDOWS DEBLOATER", "Use the recommended preset to remove bundled Windows apps.", 820);
 
             Border warning = Box(_danger);
             warning.Margin = new Thickness(0, 0, 0, 22);
             StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
             warning.Child = warningStack;
-            warningStack.Children.Add(Text("/!\\ Debloat changes are permanent", 15, FontWeights.Bold, _danger));
-            warningStack.Children.Add(Text("Debloat removals are permanent. mpware only auto-creates restore points before Registry Tweaks, not before Debloater or Cleanup actions.", 11, FontWeights.Bold, _text));
+            warningStack.Children.Add(Text("/!\\ App removal is permanent", 15, FontWeights.Bold, _danger));
+            warningStack.Children.Add(Text("mpware only creates restore points automatically before Registry Tweaks. Debloater and Cleanup do not create one for you.", 11, FontWeights.Bold, _text));
             page.Children.Add(warning);
 
             Border box = Box(_border);
@@ -427,7 +427,7 @@ namespace mpwareLauncher
             box.Child = stack;
             stack.Children.Add(Text("RECOMMENDED", 16, FontWeights.Bold, _accent));
 
-            TextBlock copy = Text("Removes OneDrive, Copilot, Widgets, Teams, and bundled Windows bloat while keeping Microsoft Store, Xbox components, and Edge.", 11, FontWeights.Normal, _muted);
+            TextBlock copy = Text("Removes OneDrive, Copilot, Widgets, Teams, and most bundled Windows bloat while keeping Microsoft Store, Xbox components, and Edge.", 11, FontWeights.Normal, _muted);
             copy.Margin = new Thickness(0, 12, 0, 20);
             stack.Children.Add(copy);
 
@@ -441,14 +441,14 @@ namespace mpwareLauncher
 
         private void ShowCleanup(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("CLEANUP", "Simple temp and cache cleanup with a visible progress log.", 760);
+            StackPanel page = BeginPage("CLEANUP", "Clear temp files and common caches with a visible progress log.", 760);
 
             Border warning = Box(_moderate);
             warning.Margin = new Thickness(0, 0, 0, 22);
             StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
             warning.Child = warningStack;
-            warningStack.Children.Add(Text("/!\\ Cleanup removes selected caches and temporary files.", 15, FontWeights.Bold, _moderate));
-            warningStack.Children.Add(Text("The cleanup window is simplified to CHECK ALL and CLEAN. It focuses on temp files, caches, and common leftovers.", 11, FontWeights.Bold, _text));
+            warningStack.Children.Add(Text("/!\\ Cleanup removes the items you select.", 15, FontWeights.Bold, _moderate));
+            warningStack.Children.Add(Text("The cleanup window keeps it simple: CHECK ALL and CLEAN. It focuses on temp files, caches, and common leftovers.", 11, FontWeights.Bold, _text));
             page.Children.Add(warning);
 
             Border box = Box(_border);
@@ -456,9 +456,9 @@ namespace mpwareLauncher
 
             StackPanel stack = new StackPanel { Margin = new Thickness(24) };
             box.Child = stack;
-            stack.Children.Add(SectionTitle("CLEANUP", "Pick cleanup targets, then run them from one compact window."));
-            stack.Children.Add(InfoLine("Only two actions are shown in the cleanup window: CHECK ALL and CLEAN."));
-            stack.Children.Add(InfoLine("A restart is optional, but it can help finish cache cleanup."));
+            stack.Children.Add(SectionTitle("CLEANUP", "Choose what to clear, then run it from one compact window."));
+            stack.Children.Add(InfoLine("The cleanup window only has two actions: CHECK ALL and CLEAN."));
+            stack.Children.Add(InfoLine("A restart is optional, but it can help finish clearing locked caches."));
 
             Button run = ActionButton("OPEN CLEANUP", delegate { RunFunctionWithVisibleConsole("Show-MpwareCleanup"); }, true);
             run.Height = 40;
@@ -471,16 +471,16 @@ namespace mpwareLauncher
 
         private void ShowRestoreTweaks(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("RESTORE TWEAKS", "Remove registry values that were added by the bundled tweak file.", 760);
+            StackPanel page = BeginPage("RESTORE TWEAKS", "Undo the registry values added by the current tweak bundle.", 760);
 
             Border box = Box(_border);
             page.Children.Add(box);
 
             StackPanel stack = new StackPanel { Margin = new Thickness(24) };
             box.Child = stack;
-            stack.Children.Add(SectionTitle("RESTORE CENTER", "Open the bundled rollback tool for the current Registry Tweaks bundle."));
-            stack.Children.Add(InfoLine("This window removes registry values that mpware added, then refreshes Explorer."));
-            stack.Children.Add(InfoLine("Debloat removals and cleanup actions still need manual reinstall or Windows restore if you want them undone."));
+            stack.Children.Add(SectionTitle("RESTORE CENTER", "Open the rollback tool for the current Registry Tweaks bundle."));
+            stack.Children.Add(InfoLine("This removes the registry values added by mpware and then refreshes Explorer and Start."));
+            stack.Children.Add(InfoLine("Debloat removals and cleanup changes still need a manual reinstall or a full Windows restore if you want them undone."));
 
             Button open = ActionButton("OPEN RESTORE CENTER", delegate { RunScript("Restore.ps1"); }, true);
             open.Height = 40;
@@ -522,7 +522,7 @@ namespace mpwareLauncher
 
         private void ShowAbout(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation, warnings, and the intended workflow.", 980);
+            StackPanel page = BeginPage("ABOUT MPWARE", "What the tool changes, what to watch for, and how to use it.", 980);
 
             Border banner = Box(_border);
             banner.Height = 230;
@@ -576,25 +576,25 @@ namespace mpwareLauncher
             StackPanel warningStack = new StackPanel { Margin = new Thickness(22) };
             warnings.Child = warningStack;
             warningStack.Children.Add(Text("/!\\ Critical Warnings", 15, FontWeights.Bold, _danger));
-            warningStack.Children.Add(Paragraph("This tool directly modifies the Windows Registry and system configuration. Know what you are applying before you run it."));
-            warningStack.Children.Add(Bullet("mpware creates a System Restore point before Registry Tweaks are applied only."));
-            warningStack.Children.Add(Bullet("mpware.exe prompts for Administrator on launch."));
-            warningStack.Children.Add(Bullet("PowerShell closes automatically after successful actions and stays open only if an error needs review."));
-            warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability, compatibility issues, or security tradeoffs."));
-            warningStack.Children.Add(Bullet("The bundled mpware powerplan is a managed tweak; it imports and activates the included .pow file."));
-            warningStack.Children.Add(Bullet("Review every change before you run it. Use the tool at your own risk."));
-            warningStack.Children.Add(Bullet("Debloat removal is permanent. Removed apps must be reinstalled from Store, winget, or Windows setup media."));
+            warningStack.Children.Add(Paragraph("mpware makes direct changes to the Windows Registry and other system settings. Review what you are applying before you run it."));
+            warningStack.Children.Add(Bullet("A restore point is created automatically before Registry Tweaks only."));
+            warningStack.Children.Add(Bullet("mpware.exe asks for Administrator rights when it starts."));
+            warningStack.Children.Add(Bullet("Helper windows close after a successful run and stay open only when there is something to review."));
+            warningStack.Children.Add(Bullet("Tweaks marked Advanced can affect stability, compatibility, or security."));
+            warningStack.Children.Add(Bullet("The bundled mpware powerplan is imported from the included .pow file and set active when selected."));
+            warningStack.Children.Add(Bullet("Debloat removal is permanent. Removed apps need to be reinstalled from Store, winget, or Windows setup media."));
+            warningStack.Children.Add(Bullet("Use the tool carefully and make sure you understand the changes you are applying."));
             page.Children.Add(warnings);
 
             Border how = Box(_border);
             how.Margin = new Thickness(0, 0, 0, 28);
             how.Child = AboutPanel("HOW TO USE MPWARE.EXE", new string[] {
-                "1. Run mpware.exe and approve the Administrator prompt.",
-                "2. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED.",
-                "3. Registry apply opens a progress log, creates a restore point, imports the selected patch, runs the required follow-up actions, and refreshes Explorer and Start.",
-                "4. GPU Driver, Programs, Debloater, and Cleanup each open their own helper window and close automatically after a successful run.",
-                "5. If an action fails, the PowerShell window stays open so you can read the error before closing it.",
-                "6. Restart your PC after deeper changes such as drivers, debloat, or larger registry batches."
+                "1. Open mpware.exe and approve the Administrator prompt.",
+                "2. In Registry Tweaks, pick the changes you want or use SELECT ALL, then click APPLY SELECTED.",
+                "3. mpware opens a progress log, creates a restore point, imports the selected registry values, runs any follow-up steps, and refreshes Explorer and Start.",
+                "4. GPU Driver, Programs, Debloater, and Cleanup each open their own helper window when you run them.",
+                "5. If something fails, the PowerShell window stays open so you can read the error before closing it.",
+                "6. Restart your PC after larger changes such as drivers, debloat, or bigger registry batches."
             }, "");
             page.Children.Add(how);
 
@@ -898,9 +898,10 @@ namespace mpwareLauncher
         {
             SetStatus(log);
             string tempScript = WriteTemporaryPowerShellScript(script);
+            string escapedTempScript = PsEscape(tempScript);
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = "powershell.exe";
-            psi.Arguments = "-NoProfile -File \"" + tempScript + "\"";
+            psi.Arguments = "-NoProfile -Command \"& { $path='" + escapedTempScript + "'; $content=[System.IO.File]::ReadAllText($path); [ScriptBlock]::Create($content).Invoke() }\"";
             if (!String.IsNullOrWhiteSpace(_runtimeRoot))
             {
                 psi.WorkingDirectory = _runtimeRoot;
@@ -914,7 +915,7 @@ namespace mpwareLauncher
         {
             string runnerRoot = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mpware", "runner");
             Directory.CreateDirectory(runnerRoot);
-            string path = IOPath.Combine(runnerRoot, "launch-" + Guid.NewGuid().ToString("N") + ".ps1");
+            string path = IOPath.Combine(runnerRoot, "launch-" + Guid.NewGuid().ToString("N") + ".txt");
             string content =
                 "$ErrorActionPreference='Continue'" + Environment.NewLine +
                 "try {" + Environment.NewLine +
@@ -1331,7 +1332,7 @@ namespace mpwareLauncher
             TweakItem item = new TweakItem();
             item.Risk = RiskForTitle(title);
             item.Name = title;
-            item.Description = "Review the registry patch before applying.";
+            item.Description = "Open the registry path preview to see exactly what this tweak changes.";
             item.Entries = new List<RegEntry>();
             item.ActionId = ActionForTitle(title);
             _tweaks.Add(item);
@@ -1429,33 +1430,33 @@ namespace mpwareLauncher
         {
             string title = tweak.Name.ToLowerInvariant();
             if (String.Equals(tweak.ActionId, "ultimate-power-plan", StringComparison.OrdinalIgnoreCase))
-                return "Imports the bundled .pow file, renames it to mpware powerplan, and activates it without deleting other plans.";
+                return "Imports the bundled .pow file, renames it to mpware powerplan, and sets it active without touching your other plans.";
             if (String.Equals(tweak.ActionId, "clear-start-pins", StringComparison.OrdinalIgnoreCase))
-                return "Applies an empty Start pin policy for the current user and clears the cached Start pin database so the pinned apps area is reset on supported Windows 11 builds.";
+                return "Clears the current user's Start pins policy and resets the cached Start pin database on supported Windows 11 builds.";
             if (String.Equals(tweak.ActionId, "black-wallpaper", StringComparison.OrdinalIgnoreCase))
-                return "Sets the desktop wallpaper to a blank solid black background and refreshes Explorer visuals immediately.";
+                return "Sets the desktop background to solid black and refreshes the shell right away.";
             if (String.Equals(tweak.ActionId, "black-taskbar", StringComparison.OrdinalIgnoreCase))
-                return "Enables dark mode and forces the Start/taskbar accent palette to solid black.";
+                return "Switches Windows to dark mode and forces the Start and taskbar accent colors to black.";
             if (ContainsAny(title, "suggested actions"))
-                return "Turns off Smart Clipboard suggested actions popups.";
+                return "Turns off the Smart Clipboard suggested actions pop-up.";
             if (ContainsAny(title, "search highlights"))
-                return "Disables dynamic Search highlight artwork/content in the taskbar search box.";
+                return "Removes Search highlights and extra content from the taskbar search box.";
             if (ContainsAny(title, "system requirements", "labconfig", "unsupported"))
-                return "Sets setup compatibility bypass values for unsupported Windows 11 hardware checks.";
+                return "Adds the setup bypass values used to skip unsupported Windows 11 hardware checks.";
             if (ContainsAny(title, "user account control", "uac"))
-                return "Changes User Account Control policy. This reduces Windows consent prompts and should be treated as advanced.";
+                return "Changes User Account Control behavior. This reduces Windows consent prompts and should be treated as an advanced tweak.";
             if (ContainsAny(title, "storage sense"))
-                return "Disables the Storage Sense policy so Windows will not automatically clean selected files.";
+                return "Turns off Storage Sense so Windows does not automatically clean selected files.";
             if (ContainsAny(title, "action center"))
-                return "Restores Action Center/notification center visibility if a policy disabled it.";
+                return "Restores Action Center and notification center visibility if a policy disabled them.";
             if (ContainsAny(title, "dark theme"))
-                return "Sets Windows personalization values so apps and the system use dark mode.";
+                return "Sets the Windows theme values so both apps and the system use dark mode.";
             if (ContainsAny(title, "100% dpi", "dpi scaling"))
-                return "Resets user DPI values to standard 100% scaling.";
+                return "Resets DPI values to the standard 100% scaling level.";
             if (ContainsAny(title, "fix scaling"))
-                return "Disables per-app automatic DPI scaling correction prompts.";
+                return "Turns off per-app DPI scaling correction prompts.";
             if (ContainsAny(title, "transparency"))
-                return "Turns off Windows transparency effects for a simpler shell and slightly less visual overhead.";
+                return "Turns off Windows transparency effects for a cleaner look and a little less visual overhead.";
             if (ContainsAny(title, "hardware accelerated gpu", "hags"))
                 return "Enables Hardware-Accelerated GPU Scheduling when the GPU and driver support it.";
             if (ContainsAny(title, "leftmost taskbar"))
