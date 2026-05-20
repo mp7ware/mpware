@@ -208,8 +208,35 @@ function Remove-MpwareEmptyRegistryKeys {
 
   foreach ($path in ($ProviderPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object Length -Descending -Unique)) {
     try {
-      if (Test-Path -LiteralPath $path) {
-        Remove-Item -LiteralPath $path -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+      $currentPath = $path
+      while (-not [string]::IsNullOrWhiteSpace($currentPath) -and $currentPath -match '^[A-Z]+:\\') {
+        if (-not (Test-Path -LiteralPath $currentPath)) {
+          break
+        }
+
+        $hasChildren = @(Get-ChildItem -LiteralPath $currentPath -ErrorAction SilentlyContinue).Count -gt 0
+        if ($hasChildren) {
+          break
+        }
+
+        $item = Get-Item -LiteralPath $currentPath -ErrorAction SilentlyContinue
+        if (-not $item) {
+          break
+        }
+
+        $valueNames = @($item.Property | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        if ($valueNames.Count -gt 0) {
+          break
+        }
+
+        Remove-Item -LiteralPath $currentPath -Force -Confirm:$false -ErrorAction Stop
+
+        $parentPath = Split-Path -Path $currentPath -Parent
+        if ([string]::IsNullOrWhiteSpace($parentPath) -or $parentPath -eq $currentPath -or $parentPath -match '^[A-Z]+:$') {
+          break
+        }
+
+        $currentPath = $parentPath
       }
     }
     catch {
