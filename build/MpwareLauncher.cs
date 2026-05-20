@@ -75,6 +75,16 @@ namespace mpwareLauncher
                 return 5;
             }
 
+            if (!File.Exists(IOPath.Combine(root, "Unpin.ps1")))
+            {
+                return 7;
+            }
+
+            if (!File.Exists(IOPath.Combine(root, "EdgeRemove.ps1")))
+            {
+                return 8;
+            }
+
             return 0;
         }
 

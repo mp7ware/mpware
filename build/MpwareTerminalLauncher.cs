@@ -363,7 +363,6 @@ namespace mpwareLauncher
             AddDebloatTile(grid, 0, 0, "RECOMMENDED", "Keeps Store, Xbox and Edge. Best first-pass cleanup.", "debloat -Autorun 1 -debloatSXE 1");
             AddDebloatTile(grid, 0, 1, "KEEP STORE", "Removes more apps but keeps Microsoft Store.", "debloat -Autorun 1 -debloatS 1");
             AddDebloatTile(grid, 1, 0, "FULL DEBLOAT", "Aggressive preset. Removes the most bundled apps.", "debloat -Autorun 1 -debloatAll 1");
-            AddDebloatTile(grid, 1, 1, "ADVANCED PRESETS", "Open the full debloat UI for manual choices.", "debloat");
 
             RefreshNav();
         }
