@@ -7,7 +7,7 @@ The current release package is:
 - `dist/mpware/mpware.exe`
 - `dist/mpware.zip`
 
-`mpware.exe` embeds the PowerShell runtime and can extract it into the current user's local app data folder when the sidecar runtime folder is not beside it.
+`mpware.exe` embeds the PowerShell runtime and can extract it into the current user's local app data folder when the `FOLDERMUSTBEONCDRIVE` sidecar runtime folder is not beside it.
 
 The launcher requests Administrator on start. Registry Tweaks create a Windows System Restore point before import, then apply selected registry groups, run required follow-up actions such as solid-black wallpaper refresh, Ultimate Performance activation, or the hidden `SetTimerResolution.exe` boot task, and restart Explorer.
 

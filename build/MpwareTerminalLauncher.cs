@@ -14,14 +14,6 @@ namespace mpwareLauncher
 {
     internal sealed class TerminalDashboardWindow : Window
     {
-        private const string CategoryGaming = "GAMING PERFORMANCE";
-        private const string CategoryNetwork = "NETWORK & LATENCY";
-        private const string CategoryPower = "CPU & POWER";
-        private const string CategoryPrivacy = "PRIVACY & TELEMETRY";
-        private const string CategoryVisual = "VISUAL & SHELL";
-        private const string CategoryWindows = "WINDOWS TWEAKS";
-        private const string CategoryContext = "CONTEXT MENU";
-
         private readonly Brush _background = BrushFromRgb(0, 0, 0);
         private readonly Brush _panel = BrushFromRgb(5, 5, 5);
         private readonly Brush _panelSoft = BrushFromRgb(10, 10, 10);
@@ -38,7 +30,6 @@ namespace mpwareLauncher
 
         private readonly Dictionary<string, Button> _navButtons = new Dictionary<string, Button>();
         private readonly List<TweakItem> _tweaks = new List<TweakItem>();
-        private readonly string _scriptPath;
         private readonly string _runtimeRoot;
         private Grid _content;
         private TextBlock _selectedCount;
@@ -47,8 +38,7 @@ namespace mpwareLauncher
 
         public TerminalDashboardWindow()
         {
-            _scriptPath = Program.ResolveScriptPath();
-            _runtimeRoot = String.IsNullOrWhiteSpace(_scriptPath) ? null : IOPath.GetDirectoryName(_scriptPath);
+            _runtimeRoot = Program.ResolveRuntimeRoot();
             BuildTweaks();
 
             Title = "mpware";
@@ -183,7 +173,7 @@ namespace mpwareLauncher
             StackPanel promptStack = new StackPanel { Margin = new Thickness(14, 10, 14, 10) };
             promptBox.Child = promptStack;
             promptStack.Children.Add(Text("> mpware.exe launches as Administrator and opens a progress log while applying changes.", 11, FontWeights.Bold, _accent));
-            promptStack.Children.Add(Text("  Selected tweaks create a Windows restore point first, then import directly with reg.exe.", 11, FontWeights.Normal, _muted));
+            promptStack.Children.Add(Text("  Selected tweaks create a Windows restore point first, apply registry values, skip already-missing delete targets, then verify the selected keys.", 11, FontWeights.Normal, _muted));
             page.Children.Add(promptBox);
 
             Grid actions = new Grid();
@@ -203,29 +193,13 @@ namespace mpwareLauncher
             buttons.Children.Add(ActionButton("SELECT ALL", delegate { SelectAllTweaks(); }, false));
             buttons.Children.Add(ActionButton("EXPORT .REG", ExportSelectedReg, false));
 
-            string currentCategory = null;
             foreach (TweakItem tweak in OrderedTweaks())
             {
-                if (!String.Equals(currentCategory, tweak.Category, StringComparison.Ordinal))
-                {
-                    currentCategory = tweak.Category;
-                    page.Children.Add(CategoryHeader(currentCategory));
-                }
                 page.Children.Add(TweakCard(tweak));
             }
 
             UpdateSelectedCount();
             RefreshNav();
-        }
-
-        private UIElement CategoryHeader(string category)
-        {
-            Grid grid = new Grid();
-            grid.Margin = new Thickness(0, 18, 0, 10);
-
-            TextBlock heading = Text(category, 16, FontWeights.Bold, _accent);
-            grid.Children.Add(heading);
-            return grid;
         }
 
         private Border TweakCard(TweakItem tweak)
@@ -680,18 +654,6 @@ namespace mpwareLauncher
             return block;
         }
 
-        private void SetCategory(string category, bool selected)
-        {
-            foreach (TweakItem tweak in _tweaks)
-            {
-                if (String.Equals(tweak.Category, category, StringComparison.Ordinal) && tweak.Selector != null)
-                {
-                    tweak.Selector.IsChecked = selected;
-                }
-            }
-            UpdateSelectedCount();
-        }
-
         private void UpdateSelectedCount()
         {
             int count = GetSelectedTweaks().Count;
@@ -740,8 +702,11 @@ namespace mpwareLauncher
 
         private void ApplyRegistryTweaks(List<TweakItem> selected, string label)
         {
-            string regPath = IOPath.Combine(IOPath.GetTempPath(), "mpware-selected-" + Guid.NewGuid().ToString("N") + ".reg");
-            File.WriteAllText(regPath, BuildRegFile(selected), Encoding.Unicode);
+            string token = Guid.NewGuid().ToString("N");
+            string regPath = IOPath.Combine(IOPath.GetTempPath(), "mpware-selected-" + token + ".reg");
+            string checksPath = IOPath.Combine(IOPath.GetTempPath(), "mpware-selected-" + token + ".checks");
+            File.WriteAllText(regPath, BuildRegFile(selected, false), Encoding.Unicode);
+            File.WriteAllText(checksPath, BuildRegistryCheckFile(selected), Encoding.UTF8);
             bool applyBlackWallpaper = HasSelectedAction(selected, "black-wallpaper");
             bool applyBlackTaskbar = HasSelectedAction(selected, "black-taskbar") || applyBlackWallpaper;
             bool applyPowerPlan = HasSelectedAction(selected, "ultimate-power-plan");
@@ -750,6 +715,7 @@ namespace mpwareLauncher
             string script =
                 "$ErrorActionPreference='Stop';" +
                 "$reg='" + PsEscape(regPath) + "';" +
+                "$checks='" + PsEscape(checksPath) + "';" +
                 "$Global:folder='" + escapedRoot + "';" +
                 "if (-not [string]::IsNullOrWhiteSpace($Global:folder)) { Set-Location -LiteralPath $Global:folder };" +
                 "$host.UI.RawUI.WindowTitle='mpware progress log';" +
@@ -758,15 +724,18 @@ namespace mpwareLauncher
                 "Write-Host 'mpware: progress log' -ForegroundColor Cyan;" +
                 "Write-Host 'mpware: preparing to apply " + PsEscape(label) + "...' -ForegroundColor Cyan;" +
                 RestorePointScript("registry tweaks") +
+                RegistryDeleteScript() +
                 "Write-Host 'mpware: importing selected registry tweaks with reg.exe...' -ForegroundColor Cyan;" +
                 "& reg.exe import $reg;" +
                 "if ($LASTEXITCODE -ne 0) { throw 'reg.exe import failed with exit code ' + $LASTEXITCODE };" +
+                VerifyRegistryScript() +
                 (applyBlackTaskbar ? ProtectedFollowUpScript("black taskbar accent", BlackTaskbarScript()) : "") +
                 (applyBlackWallpaper ? ProtectedFollowUpScript("solid black desktop background", BlackWallpaperScript()) : "") +
                 (applyPowerPlan ? ProtectedFollowUpScript("Ultimate Performance power plan", UltimatePowerPlanScript()) : "") +
                 (applyTimerResolution ? ProtectedFollowUpScript("timer resolution boot helper", TimerResolutionScript()) : "") +
                 "Write-Host 'mpware: restarting Explorer to refresh visible Windows settings...' -ForegroundColor Cyan;" +
                 "try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch { Write-Host ('mpware: explorer restart skipped: ' + $_.Exception.Message) -ForegroundColor Yellow };" +
+                "Remove-Item -LiteralPath $reg,$checks -Force -ErrorAction SilentlyContinue;" +
                 "Write-Host 'mpware: registry tweaks applied. Restart recommended.' -ForegroundColor Green;" +
                 "} catch {" +
                 "  Write-Host ''; Write-Host 'mpware: registry apply failed:' -ForegroundColor Red;" +
@@ -786,12 +755,12 @@ namespace mpwareLauncher
             }
 
             string path = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "mpware-selected-tweaks.reg");
-            File.WriteAllText(path, BuildRegFile(selected), Encoding.Unicode);
+            File.WriteAllText(path, BuildRegFile(selected, true), Encoding.Unicode);
             SetStatus("exported " + path);
             MessageBox.Show("Saved .REG export to Desktop.", "mpware", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        private string BuildRegFile(List<TweakItem> selected)
+        private string BuildRegFile(List<TweakItem> selected, bool includeDeleteSections)
         {
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("Windows Registry Editor Version 5.00");
@@ -804,7 +773,10 @@ namespace mpwareLauncher
                 {
                     if (entry.DeleteSection)
                     {
-                        sb.AppendLine("[" + entry.Section + "]");
+                        if (includeDeleteSections)
+                        {
+                            sb.AppendLine("[" + entry.Section + "]");
+                        }
                         currentSection = null;
                         continue;
                     }
@@ -818,6 +790,96 @@ namespace mpwareLauncher
                 sb.AppendLine("");
             }
             return sb.ToString();
+        }
+
+        private string BuildRegistryCheckFile(List<TweakItem> selected)
+        {
+            StringBuilder sb = new StringBuilder();
+            foreach (TweakItem tweak in selected)
+            {
+                foreach (RegEntry entry in tweak.Entries)
+                {
+                    if (entry.DeleteSection)
+                    {
+                        string path = entry.Section.StartsWith("-", StringComparison.Ordinal) ? entry.Section.Substring(1) : entry.Section;
+                        sb.AppendLine("deletekey\t" + path + "\t");
+                        continue;
+                    }
+
+                    string action = IsValueDelete(entry) ? "deletevalue" : "value";
+                    sb.AppendLine(action + "\t" + entry.Section + "\t" + NormalizeRegistryValueName(entry.ValueName));
+                }
+            }
+            return sb.ToString();
+        }
+
+        private static bool IsValueDelete(RegEntry entry)
+        {
+            return entry != null && !entry.DeleteSection && entry.ValueLine != null && entry.ValueLine.TrimEnd().EndsWith("=-", StringComparison.Ordinal);
+        }
+
+        private static string NormalizeRegistryValueName(string valueName)
+        {
+            if (String.IsNullOrWhiteSpace(valueName) || valueName.Trim() == "@")
+            {
+                return "";
+            }
+
+            string trimmed = valueName.Trim();
+            if (trimmed.Length >= 2 && trimmed[0] == '"' && trimmed[trimmed.Length - 1] == '"')
+            {
+                trimmed = trimmed.Substring(1, trimmed.Length - 2).Replace("\\\"", "\"");
+            }
+            return trimmed;
+        }
+
+        private string RegistryDeleteScript()
+        {
+            return
+                "$registryChecks=@(Get-Content -LiteralPath $checks -ErrorAction Stop);" +
+                "$deleteRows=@($registryChecks | Where-Object { $_ -like 'deletekey*' });" +
+                "if ($deleteRows.Count -gt 0) {" +
+                "  Write-Host 'mpware: deleting selected registry keys when present...' -ForegroundColor Cyan;" +
+                "  foreach ($row in $deleteRows) {" +
+                "    $parts=$row -split \"`t\",3; $path=$parts[1];" +
+                "    if ([string]::IsNullOrWhiteSpace($path)) { continue };" +
+                "    $providerPath='Registry::' + $path;" +
+                "    if (Test-Path -LiteralPath $providerPath) {" +
+                "      Remove-Item -LiteralPath $providerPath -Recurse -Force -ErrorAction Stop;" +
+                "    }" +
+                "  }" +
+                "};";
+        }
+
+        private string VerifyRegistryScript()
+        {
+            return
+                "Write-Host 'mpware: verifying selected registry keys...' -ForegroundColor Cyan;" +
+                "$failures=New-Object System.Collections.Generic.List[string];" +
+                "$verified=0;" +
+                "foreach ($row in $registryChecks) {" +
+                "  $parts=$row -split \"`t\",3; if ($parts.Count -lt 2) { continue };" +
+                "  $action=$parts[0]; $path=$parts[1]; $name=if ($parts.Count -ge 3) { $parts[2] } else { '' };" +
+                "  if ([string]::IsNullOrWhiteSpace($path)) { continue };" +
+                "  $providerPath='Registry::' + $path;" +
+                "  if ($action -eq 'deletekey') {" +
+                "    if (Test-Path -LiteralPath $providerPath) { $failures.Add('key still exists: ' + $path) } else { $verified++ };" +
+                "    continue;" +
+                "  }" +
+                "  if (-not (Test-Path -LiteralPath $providerPath)) { if ($action -eq 'deletevalue') { $verified++; continue } else { $failures.Add('missing key: ' + $path); continue } };" +
+                "  if ([string]::IsNullOrEmpty($name)) { & reg.exe query $path /ve *> $null } else { & reg.exe query $path /v $name *> $null };" +
+                "  $exists=($LASTEXITCODE -eq 0);" +
+                "  if ($action -eq 'deletevalue') {" +
+                "    if ($exists) { $failures.Add('value still exists: ' + $path + ' :: ' + $name) } else { $verified++ };" +
+                "  } else {" +
+                "    if (-not $exists) { $failures.Add('missing value: ' + $path + ' :: ' + $name) } else { $verified++ };" +
+                "  }" +
+                "};" +
+                "if ($failures.Count -gt 0) {" +
+                "  $sample=($failures | Select-Object -First 12) -join '; ';" +
+                "  throw ('registry verification failed for ' + $failures.Count + ' entry(s): ' + $sample);" +
+                "};" +
+                "Write-Host ('mpware: verified ' + $verified + ' registry entries.') -ForegroundColor Green;";
         }
 
         private void RunNvidiaDriverInstaller()
@@ -939,7 +1001,7 @@ namespace mpwareLauncher
 
         private bool EnsureRuntime()
         {
-            if (!String.IsNullOrWhiteSpace(_scriptPath) && File.Exists(_scriptPath) && Directory.Exists(_runtimeRoot))
+            if (!String.IsNullOrWhiteSpace(_runtimeRoot) && Directory.Exists(_runtimeRoot) && File.Exists(IOPath.Combine(_runtimeRoot, "RegTweaks.txt")))
             {
                 return true;
             }
@@ -1140,7 +1202,7 @@ namespace mpwareLauncher
                 "if (Test-Path -LiteralPath $timer) {" +
                 "  & $timer --install --resolution 5000;" +
                 "  if ($LASTEXITCODE -ne 0) { throw 'mpware timer resolution helper failed with exit code ' + $LASTEXITCODE };" +
-                "  & schtasks.exe /Query /TN 'mpware SetTimerResolution' /FO LIST *> $null;" +
+                "  & schtasks.exe /Query /TN '\\mpware SetTimerResolution' /FO LIST *> $null;" +
                 "  if ($LASTEXITCODE -ne 0) { throw 'mpware SetTimerResolution boot task was not registered' };" +
                 "  $runFallback=(Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'mpware SetTimerResolution' -ErrorAction SilentlyContinue);" +
                 "  if (-not $runFallback) { throw 'mpware SetTimerResolution Run fallback was not registered' };" +
@@ -1275,7 +1337,6 @@ namespace mpwareLauncher
         private TweakItem NewParsedTweak(string source, string title)
         {
             TweakItem item = new TweakItem();
-            item.Category = CategoryForTitle(source, title);
             item.Risk = RiskForTitle(title);
             item.Name = title;
             item.Description = "Review the registry patch before applying.";
@@ -1288,13 +1349,11 @@ namespace mpwareLauncher
         private void AddManagedTweaks()
         {
             TweakItem power = NewParsedTweak("MANAGED", "Enable Ultimate Performance power plan");
-            power.Category = CategoryPower;
             power.Risk = "Moderate";
             power.ActionId = "ultimate-power-plan";
             power.Description = "Activates Windows Ultimate Performance via powercfg and disables hibernation.";
 
             TweakItem timer = NewParsedTweak("MANAGED", "Enable 0.5ms timer resolution helper");
-            timer.Category = CategoryPower;
             timer.Risk = "Moderate";
             timer.ActionId = "timer-resolution";
             timer.Description = "Enables GlobalTimerResolutionRequests and installs a hidden boot task that requests 0.5ms timer resolution.";
@@ -1332,48 +1391,9 @@ namespace mpwareLauncher
             tweak.Entries.Add(entry);
         }
 
-        private string CategoryForTitle(string source, string title)
-        {
-            string text = (source + " " + title).ToLowerInvariant();
-            if (text.IndexOf("context", StringComparison.Ordinal) >= 0 || text.IndexOf("menu", StringComparison.Ordinal) >= 0) return CategoryContext;
-            if (ContainsAny(text, "game", "xbox", "mouse", "gpu", "hags", "mmcss", "fullscreen", "foreground")) return CategoryGaming;
-            if (ContainsAny(text, "network", "tcp", "qos", "nagle", "throttling", "dns")) return CategoryNetwork;
-            if (ContainsAny(text, "privacy", "telemetry", "cortana", "advertising", "location", "camera", "contacts", "calendar", "diagnostic", "activity", "ai", "copilot")) return CategoryPrivacy;
-            if (ContainsAny(text, "dark", "theme", "taskbar", "start", "explorer", "snap", "search", "widgets", "transparency", "dpi", "sound", "visual", "desktop", "gallery", "home shortcut")) return CategoryVisual;
-            if (ContainsAny(text, "power", "hibernate", "sleep", "timer", "spectre", "meltdown", "memory", "core", "hpet", "priority")) return CategoryPower;
-            return CategoryWindows;
-        }
-
         private List<TweakItem> OrderedTweaks()
         {
-            List<TweakItem> ordered = new List<TweakItem>(_tweaks);
-            ordered.Sort(delegate(TweakItem left, TweakItem right)
-            {
-                int category = CategoryRank(left.Category).CompareTo(CategoryRank(right.Category));
-                if (category != 0)
-                {
-                    return category;
-                }
-                int name = StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name);
-                if (name != 0)
-                {
-                    return name;
-                }
-                return 0;
-            });
-            return ordered;
-        }
-
-        private int CategoryRank(string category)
-        {
-            if (String.Equals(category, CategoryGaming, StringComparison.Ordinal)) return 0;
-            if (String.Equals(category, CategoryNetwork, StringComparison.Ordinal)) return 1;
-            if (String.Equals(category, CategoryPower, StringComparison.Ordinal)) return 2;
-            if (String.Equals(category, CategoryPrivacy, StringComparison.Ordinal)) return 3;
-            if (String.Equals(category, CategoryVisual, StringComparison.Ordinal)) return 4;
-            if (String.Equals(category, CategoryWindows, StringComparison.Ordinal)) return 5;
-            if (String.Equals(category, CategoryContext, StringComparison.Ordinal)) return 6;
-            return 99;
+            return new List<TweakItem>(_tweaks);
         }
 
         private string RiskForTitle(string title)
@@ -1429,18 +1449,58 @@ namespace mpwareLauncher
                 return "Sets the desktop wallpaper to a blank solid black background and refreshes Explorer visuals immediately.";
             if (String.Equals(tweak.ActionId, "black-taskbar", StringComparison.OrdinalIgnoreCase))
                 return "Enables dark mode and forces the Start/taskbar accent palette to solid black.";
+            if (ContainsAny(title, "suggested actions"))
+                return "Turns off Smart Clipboard suggested actions popups.";
+            if (ContainsAny(title, "search highlights"))
+                return "Disables dynamic Search highlight artwork/content in the taskbar search box.";
             if (ContainsAny(title, "system requirements", "labconfig", "unsupported"))
                 return "Sets setup compatibility bypass values for unsupported Windows 11 hardware checks.";
             if (ContainsAny(title, "user account control", "uac"))
                 return "Changes User Account Control policy. This reduces Windows consent prompts and should be treated as advanced.";
             if (ContainsAny(title, "storage sense"))
                 return "Disables the Storage Sense policy so Windows will not automatically clean selected files.";
+            if (ContainsAny(title, "action center"))
+                return "Restores Action Center/notification center visibility if a policy disabled it.";
             if (ContainsAny(title, "dark theme"))
                 return "Sets Windows personalization values so apps and the system use dark mode.";
+            if (ContainsAny(title, "100% dpi", "dpi scaling"))
+                return "Resets user DPI values to standard 100% scaling.";
+            if (ContainsAny(title, "fix scaling"))
+                return "Disables per-app automatic DPI scaling correction prompts.";
             if (ContainsAny(title, "transparency"))
                 return "Turns off Windows transparency effects for a simpler shell and slightly less visual overhead.";
             if (ContainsAny(title, "hardware accelerated gpu", "hags"))
                 return "Enables Hardware-Accelerated GPU Scheduling when the GPU and driver support it.";
+            if (ContainsAny(title, "leftmost taskbar"))
+                return "Aligns Windows 11 taskbar icons to the left.";
+            if (ContainsAny(title, "gallery shortcut"))
+                return "Removes the File Explorer Gallery namespace shortcut.";
+            if (ContainsAny(title, "home shortcut"))
+                return "Hides the File Explorer Home/Quick Access namespace shortcut.";
+            if (ContainsAny(title, "open file explorer to this pc"))
+                return "Makes File Explorer open to This PC instead of Home.";
+            if (ContainsAny(title, "more pins"))
+                return "Sets Start menu layout preference toward more pinned apps.";
+            if (ContainsAny(title, "recently added", "recently opened", "most used", "recommended"))
+                return "Reduces recent apps, recent documents, and recommendations in Start, jump lists, and Explorer.";
+            if (ContainsAny(title, "ai insights", "windows ai"))
+                return "Disables Windows AI/Copilot/Recall-related feature policy or visibility values.";
+            if (ContainsAny(title, "pinned items in network and sound flyout"))
+                return "Unpins selected quick actions from the Windows quick settings flyout.";
+            if (ContainsAny(title, "share app experiences"))
+                return "Turns off cross-device/shared app experience authorization values.";
+            if (ContainsAny(title, "phone companion"))
+                return "Hides and disables the Phone Link companion entry in Start.";
+            if (ContainsAny(title, "cross device resume", "resume from taskbar"))
+                return "Disables Windows cross-device resume/continue activity surfaces.";
+            if (ContainsAny(title, "dynamic lighting"))
+                return "Turns off Windows Dynamic Lighting control for RGB devices.";
+            if (ContainsAny(title, "update apps automatically"))
+                return "Disables Microsoft Store automatic app download/update policy.";
+            if (ContainsAny(title, "search from taskbar"))
+                return "Hides taskbar search UI.";
+            if (ContainsAny(title, "chat from taskbar", "task view from taskbar", "meet now", "news and interests"))
+                return "Hides selected taskbar buttons or feed surfaces.";
             if (ContainsAny(title, "game bar", "xbox capture", "game dvr"))
                 return "Controls Xbox Game Bar and Game DVR capture/overlay registry values.";
             if (ContainsAny(title, "game mode"))
@@ -1451,22 +1511,60 @@ namespace mpwareLauncher
                 return "Sets the Multimedia SystemProfile CPU reservation value used by background multimedia tasks.";
             if (ContainsAny(title, "enhance pointer", "mouse"))
                 return "Disables Enhanced Pointer Precision by setting Windows mouse acceleration thresholds to zero.";
+            if (ContainsAny(title, "sound communications"))
+                return "Sets Windows communications audio handling to do nothing instead of lowering other app volume.";
+            if (ContainsAny(title, "startup sound"))
+                return "Disables the Windows startup sound.";
             if (ContainsAny(title, "memory compression"))
                 return "Changes Memory Management values used by Windows memory compression behavior.";
             if (ContainsAny(title, "remote assistance"))
                 return "Disables Remote Assistance policy values so unsolicited assistance offers are blocked.";
+            if (ContainsAny(title, "driver searching", "co installers"))
+                return "Changes driver search/co-installer policy values used during device driver installation.";
+            if (ContainsAny(title, "automatic maintenance"))
+                return "Disables the Windows automatic maintenance scheduled maintenance policy.";
+            if (ContainsAny(title, "use my sign in info"))
+                return "Stops Windows from using sign-in info to finish updates/reopen apps after restart.";
+            if (ContainsAny(title, "automatically update maps"))
+                return "Disables automatic offline map update policy.";
+            if (ContainsAny(title, "alt tab"))
+                return "Restricts Alt+Tab to app windows only instead of showing Edge tabs.";
             if (ContainsAny(title, "long paths"))
                 return "Enables Win32 long path support for applications that opt in to long paths.";
             if (ContainsAny(title, "last access time"))
                 return "Disables NTFS last-access timestamp updates to reduce file-system metadata writes.";
             if (ContainsAny(title, "privacy deny"))
                 return "Sets Windows app privacy consent values to deny that permission for Store/UWP apps.";
+            if (ContainsAny(title, "background apps"))
+                return "Disables background app execution policy for Store/UWP apps.";
+            if (ContainsAny(title, "language list", "tracking app launches", "inking and typing", "activity history", "feedback frequency"))
+                return "Turns off personalization, activity history, feedback, or language-based tracking settings.";
             if (ContainsAny(title, "telemetry", "data collection", "diagnostic"))
                 return "Limits Windows diagnostic data and related telemetry policy values where supported by the edition.";
             if (ContainsAny(title, "copilot", "windows ai", "ai insights"))
                 return "Disables Copilot/Windows AI feature policy or visibility values.";
             if (ContainsAny(title, "search web results", "web search", "cloud content search", "safe search"))
                 return "Adjusts Windows Search policy values for web results, cloud search, or SafeSearch behavior.";
+            if (ContainsAny(title, "notifications", "subscribed content", "personalized offers"))
+                return "Disables selected notification, content suggestion, and tailored-experience values.";
+            if (ContainsAny(title, "magnifier", "narrator"))
+                return "Disables accessibility feature startup/configuration values for Magnifier or Narrator.";
+            if (ContainsAny(title, "show hidden files"))
+                return "Configures Explorer to show hidden files and folders.";
+            if (ContainsAny(title, "show file name extensions"))
+                return "Configures Explorer to show known file extensions.";
+            if (ContainsAny(title, "menu show delay"))
+                return "Removes the menu-open delay for classic Win32 menus.";
+            if (ContainsAny(title, "language hotkey", "language bar"))
+                return "Disables language switching hotkeys or hides the floating language bar.";
+            if (ContainsAny(title, "lock screen image"))
+                return "Disables lock-screen image/Spotlight surfaces.";
+            if (ContainsAny(title, "autoplay"))
+                return "Disables AutoPlay behavior for removable media.";
+            if (ContainsAny(title, "task manager always on top"))
+                return "Sets Task Manager to stay on top.";
+            if (ContainsAny(title, "show all taskbar icons"))
+                return "Changes notification-area/tray visibility values so hidden icon behavior is reduced.";
             if (ContainsAny(title, "taskbar", "start menu", "recently", "recommend", "widgets", "news and interests", "meet now", "chat", "task view"))
                 return "Changes Explorer, Start, and taskbar registry values for a cleaner Windows shell.";
             if (ContainsAny(title, "snap"))
@@ -1475,10 +1573,44 @@ namespace mpwareLauncher
                 return "Adds the Windows 11 CLSID override that opens the classic desktop context menu by default.";
             if (ContainsAny(title, "file explorer", "quick access", "hidden files", "file name extensions", "folder type"))
                 return "Changes File Explorer registry values for visibility, navigation, or default folder behavior.";
+            if (ContainsAny(title, "spotlight"))
+                return "Disables Windows Spotlight content/suggestion delivery values.";
             if (ContainsAny(title, "animations", "animate", "peek", "thumbnails", "visual", "best performance", "drop shadows", "smooth edges"))
                 return "Changes Windows visual-effects values used for animations, previews, shadows, thumbnails, and font smoothing.";
             if (ContainsAny(title, "sleep", "hibernate", "lock", "power modes", "power"))
                 return "Changes power, lock, sleep, or hibernate policy values.";
+            if (ContainsAny(title, "fault tolerant heap"))
+                return "Disables Fault Tolerant Heap compatibility mitigation tracking.";
+            if (ContainsAny(title, "icon cache"))
+                return "Increases Explorer icon cache size.";
+            if (ContainsAny(title, "blue screen"))
+                return "Shows more diagnostic information on crash/blue-screen screens.";
+            if (ContainsAny(title, "platform binary table"))
+                return "Disables Windows Platform Binary Table execution/loading behavior.";
+            if (ContainsAny(title, "web services in explorer", "publish to web"))
+                return "Disables legacy Explorer web service or web publishing integrations.";
+            if (ContainsAny(title, "document history"))
+                return "Disables Explorer document history tracking.";
+            if (ContainsAny(title, "low disk space"))
+                return "Disables low disk space warning checks.";
+            if (ContainsAny(title, "home page in settings"))
+                return "Hides the Settings app home page.";
+            if (ContainsAny(title, "view and menu as guide"))
+                return "Disables first-run guide hints for app view/menu buttons.";
+            if (ContainsAny(title, "track my device"))
+                return "Disables Find My Device/location tracking policy values.";
+            if (ContainsAny(title, "explorer open in new tab"))
+                return "Controls File Explorer new tab behavior.";
+            if (ContainsAny(title, "sleep study"))
+                return "Disables SleepStudy power diagnostics collection.";
+            if (ContainsAny(title, "device usage"))
+                return "Disables Settings Device Usage personalization categories.";
+            if (ContainsAny(title, "store settings", "app actions", "windows backup"))
+                return "Disables selected Store app settings/actions or Windows Backup account prompts.";
+            if (ContainsAny(title, "black powershell console"))
+                return "Sets classic console color-table values for a black PowerShell/CMD background.";
+            if (ContainsAny(title, "jump list", "do not disturb", "dynamic lock", "sticky keys", "filter keys", "calendar", "big clock", "prelaunch", "share"))
+                return "Adjusts the named Windows shell, notification, accessibility, or Explorer behavior.";
             if (ContainsAny(title, "context menu", "run as", "take own", "new menu", "powershell"))
                 return "Adds or changes Explorer context-menu registry entries.";
 
@@ -1504,8 +1636,50 @@ namespace mpwareLauncher
             }
             if (ContainsAny(text, "appsuselighttheme", "systemuseslighttheme"))
                 return "Controls app/system light-vs-dark theme mode; zero selects dark mode.";
+            if (ContainsAny(text, "colorprevalence", "accentpalette", "startcolormenu", "accentcolormenu", "colorizationcolor"))
+                return "Controls Windows accent color and whether Start/taskbar/title surfaces use that accent.";
             if (ContainsAny(text, "enabletransparency"))
                 return "Controls Windows transparency effects.";
+            if (ContainsAny(text, "logpixels", "win8dpiscaling", "applieddpi", "enableperprocesssystemdpi"))
+                return "Controls display DPI scaling and per-app DPI correction behavior.";
+            if (ContainsAny(text, "86ca1aa0-34aa-4e8b-a509-50c905bae2a2"))
+                return "Controls the Windows 11 classic desktop context menu override.";
+            if (ContainsAny(text, "taskbaral"))
+                return "Controls Windows 11 taskbar icon alignment.";
+            if (ContainsAny(text, "taskbarmn", "showtaskviewbutton", "searchboxtaskbarmode", "hidescameetnow", "taskbarda"))
+                return "Controls visibility of taskbar buttons or taskbar search/feed surfaces.";
+            if (ContainsAny(text, "start_trackdocs", "start_trackprogs", "showrecentlist", "hiderecentlyaddedapps", "showorhidemostusedapps", "hiderecommended"))
+                return "Controls Start menu, jump list, and recommendation history surfaces.";
+            if (ContainsAny(text, "hidefileext", "showfrequent", "hubmode", "openfolderinnewtab"))
+                return "Controls File Explorer default view/navigation behavior.";
+            if (ContainsAny(text, "unsupportedhardwarenotificationcache", "labconfig", "mosetup"))
+                return "Controls Windows 11 setup/hardware compatibility warning or bypass values.";
+            if (ContainsAny(text, "smartactionplatform", "smartclipboard"))
+                return "Controls suggested actions generated from clipboard content.";
+            if (ContainsAny(text, "storagesense"))
+                return "Controls Storage Sense automatic cleanup policy.";
+            if (ContainsAny(text, "disablenotificationcenter"))
+                return "Controls Action Center/notification center policy.";
+            if (ContainsAny(text, "snapassist", "enablesnap", "enabletaskgroups", "ditest"))
+                return "Controls snap layout, snap assist flyout, snap bar, or snap group behavior.";
+            if (ContainsAny(text, "windows\\currentversion\\explorer\\desktop\\namespace"))
+                return "Controls File Explorer namespace shortcuts.";
+            if (ContainsAny(text, "showcopilotbutton", "windowscopilot", "windowsai", "bingchat", "copilotkey", "disablecocreator", "disableimagecreator", "disableaifeatures"))
+                return "Controls Copilot, Windows AI, Recall, Paint AI, Notepad AI, or Copilot key policy values.";
+            if (ContainsAny(text, "taskbarendtask"))
+                return "Controls the End Task option on taskbar app context menus.";
+            if (ContainsAny(text, "cdp", "crossdeviceresume", "nearsdk", "romesdk"))
+                return "Controls cross-device/shared experience and resume behavior.";
+            if (ContainsAny(text, "lighting"))
+                return "Controls Windows Dynamic Lighting device integration.";
+            if (ContainsAny(text, "ucpd"))
+                return "Controls the User Choice Protection Driver startup setting.";
+            if (ContainsAny(text, "windowsstore", "autodownload"))
+                return "Controls Microsoft Store automatic app download/update policy.";
+            if (ContainsAny(text, "userduckingpreference"))
+                return "Controls whether Windows lowers other app volume during communications activity.";
+            if (ContainsAny(text, "disablestartupsound"))
+                return "Controls Windows startup sound playback.";
             if (ContainsAny(text, "appcaptureenabled", "gamedvr_enabled", "allowgamebar", "allowgamedvr"))
                 return "Controls Xbox Game Bar, Game DVR, and capture availability.";
             if (ContainsAny(text, "hwschmode"))
@@ -1524,14 +1698,16 @@ namespace mpwareLauncher
                 return "Controls Windows diagnostic data and telemetry policy values.";
             if (ContainsAny(text, "capabilityaccessmanager", "consentstore", "appprivacy"))
                 return "Controls Windows app permission consent for the named capability.";
-            if (ContainsAny(text, "windowscopilot", "showcopilotbutton", "windowsai", "allowrecallenablement", "disableaidataanalysis"))
-                return "Controls Copilot, Recall, or Windows AI feature availability.";
-            if (ContainsAny(text, "disablewebsearch", "bingsearchenabled", "cloudcontent", "safesearch"))
-                return "Controls Windows Search web, cloud, and filtering behavior.";
-            if (ContainsAny(text, "explorer\\advanced", "taskbar", "start", "searchbox", "hidefileext", "showhidden"))
+            if (ContainsAny(text, "backgroundaccessapplications", "globaluserdisabled"))
+                return "Controls whether Store/UWP apps can run in the background.";
+            if (ContainsAny(text, "disablewebsearch", "bingsearchenabled", "cloudcontent", "safesearch", "isdevicesearchhistoryenabled", "isdynamicsearchboxenabled"))
+                return "Controls Windows Search web, cloud, history, dynamic content, or filtering behavior.";
+            if (ContainsAny(text, "explorer\\advanced", "taskbar", "start", "searchbox"))
                 return "Controls Explorer, Start, taskbar, search, or file visibility behavior.";
             if (ContainsAny(text, "visualfxsetting", "userpreferencesmask", "minanimate", "taskbaranimations", "enableaeropeek"))
                 return "Controls Windows visual effects and animation behavior.";
+            if (ContainsAny(text, "listviewshadow", "dragfullwindows", "smoothscroll", "thumbnail", "icons only"))
+                return "Controls Explorer/Desktop visual effects such as shadows, drag contents, scrolling, or thumbnails.";
             if (ContainsAny(text, "\\services\\") && ContainsAny(text, "\"start\""))
                 return "Controls the startup mode for the referenced Windows service.";
             if (ContainsAny(text, "longpathsenabled"))
@@ -1542,6 +1718,40 @@ namespace mpwareLauncher
                 return "Controls Remote Assistance availability.";
             if (ContainsAny(text, "hibernat", "showsleepoption", "showlockoption"))
                 return "Controls power menu, sleep, lock, or hibernate behavior.";
+            if (ContainsAny(text, "autoplay", "nodrivetypeautorun"))
+                return "Controls AutoPlay/AutoRun behavior.";
+            if (ContainsAny(text, "multitasking", "virtualdesktops", "alttab"))
+                return "Controls multitasking or Alt+Tab shell behavior.";
+            if (ContainsAny(text, "languagebar", "hotkey", "input method"))
+                return "Controls language bar or input switching behavior.";
+            if (ContainsAny(text, "contentdeliverymanager", "subscribedcontent", "softlanding", "oempreinstalledapps"))
+                return "Controls Windows suggested content, Spotlight, consumer features, or preinstalled app suggestions.";
+            if (ContainsAny(text, "settingsync"))
+                return "Controls Windows setting-sync categories and paid-network sync behavior.";
+            if (ContainsAny(text, "findmydevice", "locationandsensors", "lfsvc"))
+                return "Controls location or Find My Device policy values.";
+            if (ContainsAny(text, "stickykeys", "filterkeys", "accessibility"))
+                return "Controls accessibility hotkey/helper behavior.";
+            if (ContainsAny(text, "faulttolerantheap"))
+                return "Controls Fault Tolerant Heap compatibility mitigation settings.";
+            if (ContainsAny(text, "max cached icons"))
+                return "Controls Explorer icon cache capacity.";
+            if (ContainsAny(text, "displayparameters", "crashcontrol"))
+                return "Controls crash/blue-screen diagnostic display behavior.";
+            if (ContainsAny(text, "wpbt"))
+                return "Controls Windows Platform Binary Table behavior.";
+            if (ContainsAny(text, "colortable", "screencolors"))
+                return "Controls classic console color palette/background values.";
+            if (ContainsAny(text, "traynotify", "systemtray"))
+                return "Controls notification-area/tray icon visibility behavior.";
+            if (ContainsAny(text, "settingspagevisibility"))
+                return "Controls which Settings app pages are hidden or visible.";
+            if (ContainsAny(text, "nolowdiskspacechecks"))
+                return "Controls Explorer low disk space warning checks.";
+            if (ContainsAny(text, "nowebservices", "nopublishingwizard"))
+                return "Controls legacy Explorer web service and web publishing integrations.";
+            if (ContainsAny(text, "disablelogonbackgroundimage"))
+                return "Controls lock/sign-in screen background image behavior.";
             return "Writes " + entry.ValueName + " under " + entry.Section + ".";
         }
 
@@ -1569,7 +1779,6 @@ namespace mpwareLauncher
 
         private sealed class TweakItem
         {
-            public string Category;
             public string Risk;
             public string Name;
             public string Description;

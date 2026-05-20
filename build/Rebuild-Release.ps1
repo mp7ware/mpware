@@ -13,7 +13,7 @@ if (-not $PackageRoot) {
 
 $launcherExe = Join-Path $PackageRoot 'mpware.exe'
 $zipPath = Join-Path $root 'dist\mpware.zip'
-$runtimeRoot = Join-Path $PackageRoot '_FOLDERMUSTBEONCDRIVE'
+$runtimeRoot = Join-Path $PackageRoot 'FOLDERMUSTBEONCDRIVE'
 $launcherSource = Join-Path $PSScriptRoot 'MpwareLauncher.cs'
 $terminalSource = Join-Path $PSScriptRoot 'MpwareTerminalLauncher.cs'
 $timerSource = Join-Path $PSScriptRoot 'MpwareTimerResolution.cs'
@@ -21,8 +21,8 @@ $launcherManifest = Join-Path $PSScriptRoot 'MpwareLauncher.manifest'
 $launcherIcon = Join-Path $runtimeRoot 'mpwareIcons\mp7.ico'
 $timerExe = Join-Path $runtimeRoot 'SetTimerResolution.exe'
 
-if (-not (Test-Path -LiteralPath (Join-Path $runtimeRoot 'mpware.ps1'))) {
-    throw "Missing runtime script: $runtimeRoot"
+if (-not (Test-Path -LiteralPath (Join-Path $runtimeRoot 'RegTweaks.txt'))) {
+    throw "Missing runtime files: $runtimeRoot"
 }
 if (-not (Test-Path -LiteralPath $launcherSource)) {
     throw "Missing launcher source: $launcherSource"
