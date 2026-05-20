@@ -88,66 +88,119 @@ function Custom-MsgBox {
   return 'Cancel'
 }
 
+function Remove-MpwareAppxPattern {
+  param([string]$Pattern)
+
+  $installed = Get-AppxPackage -AllUsers -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like $Pattern -or $_.PackageFullName -like $Pattern }
+  foreach ($package in $installed) {
+    Write-Status "Removing installed package $($package.Name)"
+    try {
+      Remove-AppxPackage -Package $package.PackageFullName -AllUsers -ErrorAction Stop
+    }
+    catch {
+      Remove-AppxPackage -Package $package.PackageFullName -ErrorAction SilentlyContinue
+    }
+  }
+
+  $provisioned = Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
+    Where-Object { $_.DisplayName -like $Pattern -or $_.PackageName -like $Pattern }
+  foreach ($package in $provisioned) {
+    Write-Status "Removing provisioned package $($package.DisplayName)"
+    Remove-AppxProvisionedPackage -Online -PackageName $package.PackageName -ErrorAction SilentlyContinue | Out-Null
+  }
+}
+
+function Disable-MpwareCopilot {
+  Write-Status 'Disabling Copilot policy and taskbar entry'
+  $keys = @(
+    'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot',
+    'HKLM:\Software\Policies\Microsoft\Windows\WindowsCopilot'
+  )
+  foreach ($key in $keys) {
+    New-Item -Path $key -Force | Out-Null
+    Set-ItemProperty -Path $key -Name 'TurnOffWindowsCopilot' -Type DWord -Value 1 -Force
+  }
+
+  $advanced = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+  New-Item -Path $advanced -Force | Out-Null
+  Set-ItemProperty -Path $advanced -Name 'ShowCopilotButton' -Type DWord -Value 0 -Force
+
+  $bingChat = 'HKLM:\Software\Microsoft\Windows\Shell\Copilot\BingChat'
+  New-Item -Path $bingChat -Force | Out-Null
+  Set-ItemProperty -Path $bingChat -Name 'IsUserEligible' -Type DWord -Value 0 -Force
+}
+
 function Invoke-MpwareDebloatPreset {
   param(
     [ValidateSet('Recommended', 'KeepStore', 'Full')]
     [string]$Preset
   )
 
-  $common = @(
-    'Microsoft.BingNews',
-    'Microsoft.BingWeather',
-    'Microsoft.GetHelp',
-    'Microsoft.Getstarted',
-    'Microsoft.MicrosoftOfficeHub',
-    'Microsoft.MicrosoftSolitaireCollection',
-    'Microsoft.People',
-    'Microsoft.PowerAutomateDesktop',
-    'Microsoft.Todos',
-    'Microsoft.WindowsFeedbackHub',
-    'Microsoft.ZuneMusic',
-    'Microsoft.ZuneVideo',
-    'Microsoft.YourPhone',
-    'MicrosoftTeams',
-    'MSTeams'
+  $recommended = @(
+    '*Clipchamp.Clipchamp*',
+    '*Microsoft.549981C3F5F10*',
+    '*Microsoft.BingNews*',
+    '*Microsoft.BingWeather*',
+    '*Microsoft.Copilot*',
+    '*Microsoft.GetHelp*',
+    '*Microsoft.Getstarted*',
+    '*Microsoft.MicrosoftOfficeHub*',
+    '*Microsoft.MicrosoftSolitaireCollection*',
+    '*Microsoft.MixedReality.Portal*',
+    '*Microsoft.Office.OneNote*',
+    '*Microsoft.People*',
+    '*Microsoft.PowerAutomateDesktop*',
+    '*Microsoft.SkypeApp*',
+    '*Microsoft.Todos*',
+    '*Microsoft.Wallet*',
+    '*Microsoft.Windows.DevHome*',
+    '*Microsoft.Windows.Photos*',
+    '*Microsoft.WindowsAlarms*',
+    '*Microsoft.WindowsCamera*',
+    '*Microsoft.WindowsFeedbackHub*',
+    '*Microsoft.WindowsMaps*',
+    '*Microsoft.WindowsSoundRecorder*',
+    '*Microsoft.Windows.Copilot*',
+    '*Microsoft.Windows.Ai.Copilot*',
+    '*Microsoft.WindowsCommunicationsApps*',
+    '*Microsoft.WindowsPhone*',
+    '*Microsoft.YourPhone*',
+    '*Microsoft.ZuneMusic*',
+    '*Microsoft.ZuneVideo*',
+    '*MicrosoftCorporationII.MicrosoftFamily*',
+    '*MicrosoftCorporationII.QuickAssist*',
+    '*MicrosoftTeams*',
+    '*MSTeams*'
   )
 
-  $keepStore = $common + @(
-    'Clipchamp.Clipchamp',
-    'Microsoft.549981C3F5F10',
-    'Microsoft.MixedReality.Portal',
-    'Microsoft.Office.OneNote',
-    'Microsoft.SkypeApp',
-    'Microsoft.WindowsAlarms',
-    'Microsoft.WindowsCamera',
-    'Microsoft.WindowsMaps',
-    'Microsoft.WindowsSoundRecorder'
+  $keepStore = $recommended + @(
+    '*Microsoft.GamingApp*',
+    '*Microsoft.Xbox*',
+    '*Microsoft.Xbox.TCUI*',
+    '*Microsoft.XboxApp*',
+    '*Microsoft.XboxGameOverlay*',
+    '*Microsoft.XboxGamingOverlay*',
+    '*Microsoft.XboxIdentityProvider*',
+    '*Microsoft.XboxSpeechToTextOverlay*',
+    '*MicrosoftWindows.Client.WebExperience*'
   )
 
   $full = $keepStore + @(
-    'Microsoft.GamingApp',
-    'Microsoft.Xbox.TCUI',
-    'Microsoft.XboxApp',
-    'Microsoft.XboxGameOverlay',
-    'Microsoft.XboxGamingOverlay',
-    'Microsoft.XboxIdentityProvider',
-    'Microsoft.XboxSpeechToTextOverlay'
+    '*Microsoft.StorePurchaseApp*',
+    '*Microsoft.WindowsStore*'
   )
 
-  $targets = $common
+  $targets = $recommended
   if ($Preset -eq 'KeepStore') { $targets = $keepStore }
   if ($Preset -eq 'Full') { $targets = $full }
 
   Write-Status "Running $Preset debloat preset..."
-  foreach ($name in ($targets | Sort-Object -Unique)) {
-    Write-Status "Removing $name"
-    Get-AppxPackage -AllUsers -Name $name -ErrorAction SilentlyContinue |
-      ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }
-    Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
-      Where-Object { $_.DisplayName -eq $name } |
-      ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }
+  Disable-MpwareCopilot
+  foreach ($pattern in ($targets | Sort-Object -Unique)) {
+    Remove-MpwareAppxPattern -Pattern $pattern
   }
-  Write-Status 'Debloat preset finished.' 'Success'
+  Write-Status 'Debloat preset finished. Restart recommended.' 'Success'
 }
 
 function Show-MpwareCleanup {
