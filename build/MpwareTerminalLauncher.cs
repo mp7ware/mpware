@@ -16,7 +16,6 @@ namespace mpwareLauncher
     {
         private readonly Brush _background = BrushFromRgb(0, 0, 0);
         private readonly Brush _panel = BrushFromRgb(5, 5, 5);
-        private readonly Brush _panelSoft = BrushFromRgb(10, 10, 10);
         private readonly Brush _border = BrushFromRgb(236, 236, 236);
         private readonly Brush _borderDim = BrushFromRgb(83, 83, 83);
         private readonly Brush _text = BrushFromRgb(238, 238, 238);
@@ -406,16 +405,21 @@ namespace mpwareLauncher
             warningStack.Children.Add(Text("Removed Store apps usually need to be reinstalled from Microsoft Store or winget. mpware only auto-creates restore points before registry tweak imports.", 11, FontWeights.Bold, _text));
             page.Children.Add(warning);
 
-            Grid grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition());
-            grid.ColumnDefinitions.Add(new ColumnDefinition());
-            grid.RowDefinitions.Add(new RowDefinition());
-            grid.RowDefinitions.Add(new RowDefinition());
-            page.Children.Add(grid);
+            Border box = Box(_border);
+            page.Children.Add(box);
 
-            AddDebloatTile(grid, 0, 0, "RECOMMENDED", "Removes common bloat and Copilot. Keeps Microsoft Store, Xbox, and Edge.", "Invoke-MpwareDebloatPreset -Preset Recommended");
-            AddDebloatTile(grid, 0, 1, "KEEP STORE", "Recommended plus Xbox and Widgets cleanup. Keeps Microsoft Store.", "Invoke-MpwareDebloatPreset -Preset KeepStore");
-            AddDebloatTile(grid, 1, 0, "FULL DEBLOAT", "Aggressive preset. Removes Store, Xbox, Copilot, Widgets, and bundled apps.", "Invoke-MpwareDebloatPreset -Preset Full");
+            StackPanel stack = new StackPanel { Margin = new Thickness(24) };
+            box.Child = stack;
+            stack.Children.Add(Text("RECOMMENDED", 16, FontWeights.Bold, _accent));
+
+            TextBlock copy = Text("Removes bundled Windows bloat and Copilot while keeping Microsoft Store, Xbox components, and Edge.", 11, FontWeights.Normal, _muted);
+            copy.Margin = new Thickness(0, 12, 0, 20);
+            stack.Children.Add(copy);
+
+            Button run = ActionButton("RUN", delegate { RunFunctionWithVisibleConsole("Invoke-MpwareDebloatPreset"); }, true);
+            run.Height = 40;
+            run.HorizontalAlignment = HorizontalAlignment.Stretch;
+            stack.Children.Add(run);
 
             RefreshNav();
         }
@@ -472,26 +476,6 @@ namespace mpwareLauncher
             RefreshNav();
         }
 
-        private void AddDebloatTile(Grid grid, int row, int col, string title, string description, string functionCall)
-        {
-            Border tile = Box(_border);
-            tile.Margin = new Thickness(col == 0 ? 0 : 10, row == 0 ? 0 : 10, col == 0 ? 10 : 0, row == 0 ? 10 : 0);
-            Grid.SetRow(tile, row);
-            Grid.SetColumn(tile, col);
-            grid.Children.Add(tile);
-
-            StackPanel stack = new StackPanel { Margin = new Thickness(20) };
-            tile.Child = stack;
-            stack.Children.Add(Text(title, 16, FontWeights.Bold, _accent));
-            TextBlock copy = Text(description, 11, FontWeights.Normal, _muted);
-            copy.Margin = new Thickness(0, 10, 0, 18);
-            stack.Children.Add(copy);
-
-            Button run = ActionButton("RUN", delegate { RunFunctionWithVisibleConsole(functionCall); }, true);
-            run.HorizontalAlignment = HorizontalAlignment.Stretch;
-            stack.Children.Add(run);
-        }
-
         private Grid BuildProgramsRow(Button[] buttons)
         {
             System.Windows.Controls.Primitives.UniformGrid grid = new System.Windows.Controls.Primitives.UniformGrid();
@@ -523,8 +507,7 @@ namespace mpwareLauncher
 
         private void ShowAbout(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation and important warnings.", 1600);
-            page.HorizontalAlignment = HorizontalAlignment.Stretch;
+            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation and important warnings.", 980);
 
             Border banner = Box(_border);
             banner.Height = 230;
@@ -588,28 +571,17 @@ namespace mpwareLauncher
             warningStack.Children.Add(Bullet("Debloat removal is permanent. Removed apps must be reinstalled from Store, winget, or Windows setup media."));
             page.Children.Add(warnings);
 
-            Grid two = new Grid();
-            two.ColumnDefinitions.Add(new ColumnDefinition());
-            two.ColumnDefinitions.Add(new ColumnDefinition());
-            two.Margin = new Thickness(0, 0, 0, 28);
-            page.Children.Add(two);
-
             Border how = Box(_border);
-            how.Margin = new Thickness(0, 0, 12, 0);
+            how.Margin = new Thickness(0, 0, 0, 28);
             how.Child = AboutPanel("HOW TO USE MPWARE.EXE", new string[] {
                 "1. Run mpware.exe and approve the Administrator prompt.",
                 "2. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED.",
                 "3. Registry apply opens a progress log, creates a Windows restore point, imports the selected patch, runs needed follow-up actions, and restarts Explorer.",
-                "4. PowerShell closes automatically when an action succeeds. If it fails, the window stays open so you can read the error.",
-                "5. NVIDIA, Debloater, and Cleanup are separate tools. Restart your PC after deeper changes."
+                "4. NVIDIA Driver, Programs, Debloater, and Cleanup each open their own helper window and close automatically after a successful run.",
+                "5. If an action fails, the PowerShell window stays open so you can read the error before closing it.",
+                "6. Restart your PC after deeper changes such as drivers, debloat, or larger registry batches."
             }, "");
-            two.Children.Add(how);
-
-            Border risk = Box(_border);
-            risk.Margin = new Thickness(12, 0, 0, 0);
-            risk.Child = RiskPanel();
-            Grid.SetColumn(risk, 1);
-            two.Children.Add(risk);
+            page.Children.Add(how);
 
             RefreshNav();
         }
@@ -633,35 +605,6 @@ namespace mpwareLauncher
                 stack.Children.Add(keys);
             }
             return stack;
-        }
-
-        private StackPanel RiskPanel()
-        {
-            StackPanel stack = new StackPanel { Margin = new Thickness(22) };
-            stack.Children.Add(Text("[] RISK LEVELS", 15, FontWeights.Bold, _accent));
-            stack.Children.Add(RiskLine("SAFE", _safe, "Well-tested tweaks, no realistic downside. Apply freely."));
-            stack.Children.Add(RiskLine("MODERATE", _moderate, "May affect background functionality. Test after applying."));
-            stack.Children.Add(RiskLine("ADVANCED", _advanced, "Can cause instability or security implications. Experienced users only."));
-            return stack;
-        }
-
-        private StackPanel RiskLine(string label, Brush brush, string copy)
-        {
-            StackPanel row = new StackPanel { Orientation = Orientation.Horizontal };
-            row.Margin = new Thickness(0, 18, 0, 0);
-
-            Border pill = new Border();
-            pill.Background = brush;
-            pill.Padding = new Thickness(6, 2, 6, 2);
-            pill.Margin = new Thickness(0, 0, 12, 0);
-            pill.VerticalAlignment = VerticalAlignment.Top;
-            pill.Child = Text(label, 9, FontWeights.Bold, _background);
-            row.Children.Add(pill);
-
-            TextBlock description = Text(copy, 11, FontWeights.Normal, _text);
-            description.MaxWidth = 250;
-            row.Children.Add(description);
-            return row;
         }
 
         private TextBlock InfoLine(string text)
@@ -949,6 +892,7 @@ namespace mpwareLauncher
 
             string command =
                 "$ErrorActionPreference='Stop';" +
+                "$ConfirmPreference='None';" +
                 "try {" +
                 "  Set-Location -LiteralPath '" + PsEscape(nvidiaRoot) + "';" +
                 "  $Global:folder='" + PsEscape(_runtimeRoot) + "';" +
@@ -961,11 +905,11 @@ namespace mpwareLauncher
                 "  Write-Host 'mpware: starting NVIDIA driver helper with bundled Inspector profile...' -ForegroundColor Cyan;" +
                 "  & '" + PsEscape(script) + "';" +
                 "  Write-Host 'mpware: NVIDIA helper finished.' -ForegroundColor Green;" +
-                "  Write-Host ''; Read-Host 'Press Enter to close';" +
+                "  exit 0;" +
                 "} catch {" +
                 "  Write-Host ''; Write-Host 'mpware: NVIDIA helper failed:' -ForegroundColor Red;" +
                 "  Write-Host $_.Exception.Message -ForegroundColor Red;" +
-                "  Write-Host ''; Read-Host 'Press Enter to close';" +
+                "  Write-Host ''; Read-Host 'Press Enter to close'; exit 1;" +
                 "}";
 
             RunElevatedPowerShell(command, "launching NVIDIA driver helper");
@@ -1024,7 +968,8 @@ namespace mpwareLauncher
             SetStatus("launching " + functionCall);
             string escapedRoot = PsEscape(_runtimeRoot);
             string command =
-                "$ErrorActionPreference='Continue';" +
+                "$ErrorActionPreference='Stop';" +
+                "$ConfirmPreference='None';" +
                 "$host.UI.RawUI.WindowTitle='mpware progress log';" +
                 "Clear-Host;" +
                 "Write-Host 'mpware: progress log' -ForegroundColor Cyan;" +
@@ -1037,10 +982,11 @@ namespace mpwareLauncher
                 "  Write-Host 'mpware: starting " + PsEscape(functionCall) + "...' -ForegroundColor Cyan;" +
                 "  " + functionCall + ";" +
                 "  Write-Host 'mpware: command finished.' -ForegroundColor Green;" +
+                "  exit 0;" +
                 "} catch {" +
                 "  Write-Host ''; Write-Host 'mpware: command failed:' -ForegroundColor Red;" +
                 "  Write-Host $_.Exception.Message -ForegroundColor Red;" +
-                "  Write-Host ''; Read-Host 'Press Enter to close';" +
+                "  Write-Host ''; Read-Host 'Press Enter to close'; exit 1;" +
                 "}";
             RunElevatedPowerShell(command, "launching " + functionCall);
         }
