@@ -39,6 +39,29 @@ function Search-File {
   return $null
 }
 
+function Clear-MpwareFolderContents {
+  param([string]$Path)
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return
+  }
+
+  Get-ChildItem -LiteralPath $Path -Force -ErrorAction SilentlyContinue |
+    ForEach-Object {
+      Remove-Item -LiteralPath $_.FullName -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+    }
+}
+
+function Remove-MpwarePath {
+  param([string]$Path)
+
+  if (-not (Test-Path -Path $Path)) {
+    return
+  }
+
+  Remove-Item -Path $Path -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+}
+
 function Create-ModernButton {
   param(
     [string]$Text,
@@ -128,7 +151,7 @@ function Invoke-MpwareWingetInstall {
   }
 
   Write-Status "Installing $DisplayName with winget..."
-  & winget install --id $Id -e --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity
+  & winget install --id $Id -e --source winget --accept-package-agreements --accept-source-agreements --disable-interactivity --silent
   if ($LASTEXITCODE -ne 0) {
     throw "winget install failed for $DisplayName (exit code $LASTEXITCODE)."
   }
@@ -260,16 +283,12 @@ function Disable-MpwareCopilot {
 }
 
 function Invoke-MpwareDebloatPreset {
-  param(
-    [ValidateSet('Recommended', 'KeepStore', 'Full')]
-    [string]$Preset
-  )
-
-  $recommended = @(
+  $targets = @(
     '*Clipchamp.Clipchamp*',
     '*Microsoft.549981C3F5F10*',
     '*Microsoft.BingNews*',
     '*Microsoft.BingWeather*',
+    '*Microsoft.BingSearch*',
     '*Microsoft.Copilot*',
     '*Microsoft.GetHelp*',
     '*Microsoft.Getstarted*',
@@ -292,7 +311,9 @@ function Invoke-MpwareDebloatPreset {
     '*Microsoft.Windows.Copilot*',
     '*Microsoft.Windows.Ai.Copilot*',
     '*Microsoft.WindowsCommunicationsApps*',
+    '*Microsoft.OutlookForWindows*',
     '*Microsoft.WindowsPhone*',
+    '*MicrosoftWindows.Client.WebExperience*',
     '*Microsoft.YourPhone*',
     '*Microsoft.ZuneMusic*',
     '*Microsoft.ZuneVideo*',
@@ -302,28 +323,7 @@ function Invoke-MpwareDebloatPreset {
     '*MSTeams*'
   )
 
-  $keepStore = $recommended + @(
-    '*Microsoft.GamingApp*',
-    '*Microsoft.Xbox*',
-    '*Microsoft.Xbox.TCUI*',
-    '*Microsoft.XboxApp*',
-    '*Microsoft.XboxGameOverlay*',
-    '*Microsoft.XboxGamingOverlay*',
-    '*Microsoft.XboxIdentityProvider*',
-    '*Microsoft.XboxSpeechToTextOverlay*',
-    '*MicrosoftWindows.Client.WebExperience*'
-  )
-
-  $full = $keepStore + @(
-    '*Microsoft.StorePurchaseApp*',
-    '*Microsoft.WindowsStore*'
-  )
-
-  $targets = $recommended
-  if ($Preset -eq 'KeepStore') { $targets = $keepStore }
-  if ($Preset -eq 'Full') { $targets = $full }
-
-  Write-Status "Running $Preset debloat preset..."
+  Write-Status 'Running recommended debloat preset...'
   Disable-MpwareCopilot
   foreach ($pattern in ($targets | Sort-Object -Unique)) {
     Remove-MpwareAppxPattern -Pattern $pattern
@@ -332,6 +332,7 @@ function Invoke-MpwareDebloatPreset {
 }
 
 function Show-MpwareCleanup {
+  $ConfirmPreference = 'None'
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
   [System.Windows.Forms.Application]::EnableVisualStyles()
@@ -386,42 +387,50 @@ function Show-MpwareCleanup {
   $form.Controls.Add($clean)
   $form.AcceptButton = $clean
 
-  if ($form.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+  $selectedItems = @()
+  try {
+    $dialogResult = $form.ShowDialog()
+    $selectedItems = @($list.CheckedItems | ForEach-Object { $_.ToString() })
+  }
+  finally {
+    $form.Dispose()
+  }
+
+  if ($dialogResult -ne [System.Windows.Forms.DialogResult]::OK) {
+    Write-Status 'Cleanup cancelled.' 'Warn'
     return
   }
 
-  foreach ($item in $list.CheckedItems) {
+  foreach ($item in $selectedItems) {
     Write-Status "Cleaning $item"
     switch ($item) {
       'User temp files' {
-        Get-ChildItem -LiteralPath $env:TEMP -Force -ErrorAction SilentlyContinue |
-          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        Clear-MpwareFolderContents -Path $env:TEMP
       }
       'Windows temp files' {
-        Get-ChildItem -LiteralPath "$env:SystemRoot\Temp" -Force -ErrorAction SilentlyContinue |
-          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        Clear-MpwareFolderContents -Path "$env:SystemRoot\Temp"
       }
       'Recycle Bin' {
-        Clear-RecycleBin -Force -ErrorAction SilentlyContinue
+        Clear-RecycleBin -Force -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
       }
       'Thumbnail cache' {
-        Remove-Item -Path "$env:LocalAppData\Microsoft\Windows\Explorer\thumbcache_*.db" -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$env:LocalAppData\Microsoft\Windows\Explorer\thumbcache_*.db" -Force -Confirm:$false -ErrorAction SilentlyContinue
       }
       'DirectX shader cache' {
-        Remove-Item -Path "$env:LocalAppData\D3DSCache\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-MpwarePath -Path "$env:LocalAppData\D3DSCache\*"
       }
       'NVIDIA shader cache' {
-        Remove-Item -Path "$env:LocalAppData\NVIDIA\GLCache" -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path "$env:USERPROFILE\AppData\LocalLow\NVIDIA\PerDriverVersion\DXCache" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-MpwarePath -Path "$env:LocalAppData\NVIDIA\GLCache"
+        Remove-MpwarePath -Path "$env:USERPROFILE\AppData\LocalLow\NVIDIA\PerDriverVersion\DXCache"
       }
       'Delivery Optimization cache' {
-        Remove-Item -Path "$env:SystemRoot\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-MpwarePath -Path "$env:SystemRoot\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\*"
       }
       'Windows error reports' {
-        Remove-Item -Path "$env:ProgramData\Microsoft\Windows\WER\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-MpwarePath -Path "$env:ProgramData\Microsoft\Windows\WER\*"
       }
       'Event Viewer logs' {
-        wevtutil el | ForEach-Object { wevtutil cl "$_" 2>$null }
+        wevtutil el | ForEach-Object { wevtutil cl "$_" 2>$null | Out-Null }
       }
     }
   }

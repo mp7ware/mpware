@@ -149,20 +149,10 @@ function Download-AppxPackage {
                   
         $downloadFile = Join-Path $downloadFolder $filename
                   
-        # If file already exists, ask to replace it
+        # Reuse an existing download so the helper never blocks on an overwrite prompt.
         if (Test-Path $downloadFile) {
-            Write-Host "`"${filename}`" already exists at `"${downloadFile}`"."
-            $confirmation = ''
-            while (!(($confirmation -eq 'Y') -Or ($confirmation -eq 'N'))) {
-                $confirmation = Read-Host "`nWould you like to re-download and overwrite the file at `"${downloadFile}`" (Y/N)?"
-                $confirmation = $confirmation.ToUpper()
-            }
-            if ($confirmation -eq 'Y') {
-                Remove-Item -Path $downloadFile -Force
-            }
-            else {
-                $DownloadedFiles += $downloadFile
-            }
+            Write-Host "Using existing file `"${downloadFile}`"."
+            $DownloadedFiles += $downloadFile
         }
                   
         if (!(Test-Path $downloadFile)) {
