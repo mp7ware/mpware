@@ -8,7 +8,7 @@ using Microsoft.Win32;
 
 internal static class MpwareTimerResolution
 {
-    private const string TaskName = "\\mpware SetTimerResolution";
+    private const string TaskName = "mpware SetTimerResolution";
     private const string LegacyTaskName = "\\mpware timer resolution";
     private const string RunValueName = "mpware SetTimerResolution";
 
@@ -48,7 +48,8 @@ internal static class MpwareTimerResolution
         string current = Assembly.GetExecutingAssembly().Location;
         if (!String.Equals(current, target, StringComparison.OrdinalIgnoreCase))
         {
-            File.Copy(current, target, true);
+            StopExistingTarget(target);
+            CopyWithRetry(current, target);
         }
 
         string taskCommand = target + " --hold --resolution " + resolution;
@@ -59,6 +60,54 @@ internal static class MpwareTimerResolution
         TryRunSchtasks("/Run /TN \"" + TaskName + "\"");
         StartHidden(target, "--hold --resolution " + resolution);
         return 0;
+    }
+
+    private static void StopExistingTarget(string target)
+    {
+        string processName = Path.GetFileNameWithoutExtension(target);
+        foreach (Process process in Process.GetProcessesByName(processName))
+        {
+            try
+            {
+                string path = process.MainModule.FileName;
+                if (String.Equals(path, target, StringComparison.OrdinalIgnoreCase))
+                {
+                    process.Kill();
+                    process.WaitForExit(3000);
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    private static void CopyWithRetry(string source, string target)
+    {
+        Exception last = null;
+        for (int attempt = 0; attempt < 6; attempt++)
+        {
+            try
+            {
+                File.Copy(source, target, true);
+                return;
+            }
+            catch (IOException ex)
+            {
+                last = ex;
+                Thread.Sleep(250);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                last = ex;
+                Thread.Sleep(250);
+            }
+        }
+        throw new IOException("Could not update " + target, last);
     }
 
     private static int SelfTest(uint resolution)
