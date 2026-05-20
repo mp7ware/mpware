@@ -169,6 +169,9 @@ function Get-MpwareManagedRestoreEntries {
     @{ ProviderPath = 'HKCU:\Software\Microsoft\Windows\DWM'; RegPath = 'HKCU\Software\Microsoft\Windows\DWM'; ValueName = 'ColorizationColor'; IsDefault = $false },
     @{ ProviderPath = 'HKCU:\Software\Microsoft\Windows\DWM'; RegPath = 'HKCU\Software\Microsoft\Windows\DWM'; ValueName = 'ColorizationAfterglow'; IsDefault = $false },
     @{ ProviderPath = 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\Explorer'; RegPath = 'HKCU\SOFTWARE\Policies\Microsoft\Windows\Explorer'; ValueName = 'ConfigureStartPins'; IsDefault = $false },
+    @{ ProviderPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Explorer'; RegPath = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer'; ValueName = 'ConfigureStartPins'; IsDefault = $false },
+    @{ ProviderPath = 'HKCU:\SOFTWARE\Microsoft\PolicyManager\current\user\Start'; RegPath = 'HKCU\SOFTWARE\Microsoft\PolicyManager\current\user\Start'; ValueName = 'ConfigureStartPins'; IsDefault = $false },
+    @{ ProviderPath = 'HKCU:\SOFTWARE\Microsoft\PolicyManager\current\user\Start'; RegPath = 'HKCU\SOFTWARE\Microsoft\PolicyManager\current\user\Start'; ValueName = 'ConfigureStartPins_ProviderSet'; IsDefault = $false },
     @{ ProviderPath = 'HKLM:\SOFTWARE\Microsoft\PolicyManager\current\device\Start'; RegPath = 'HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start'; ValueName = 'ConfigureStartPins'; IsDefault = $false },
     @{ ProviderPath = 'HKLM:\SOFTWARE\Microsoft\PolicyManager\current\device\Start'; RegPath = 'HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start'; ValueName = 'ConfigureStartPins_ProviderSet'; IsDefault = $false }
   )
@@ -281,6 +284,11 @@ foreach ($entry in $allEntries) {
 }
 
 Remove-MpwareEmptyRegistryKeys -ProviderPaths $touchedPaths
+
+$shellLayout = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Shell\LayoutModification.json'
+if (Test-Path -LiteralPath $shellLayout) {
+  Remove-Item -LiteralPath $shellLayout -Force -ErrorAction SilentlyContinue
+}
 
 try {
   Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue
