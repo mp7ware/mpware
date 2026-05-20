@@ -349,6 +349,8 @@ namespace mpwareLauncher
             StackPanel page = BeginPage("GPU DRIVER", "Open the bundled driver and vendor tools from one place.", 760);
 
             Border box = Box(_border);
+            box.Width = 720;
+            box.HorizontalAlignment = HorizontalAlignment.Center;
             page.Children.Add(box);
 
             StackPanel stack = new StackPanel { Margin = new Thickness(28) };
@@ -360,6 +362,8 @@ namespace mpwareLauncher
 
             StackPanel buttons = new StackPanel();
             buttons.Margin = new Thickness(0, 24, 0, 0);
+            buttons.Width = 660;
+            buttons.HorizontalAlignment = HorizontalAlignment.Center;
             stack.Children.Add(buttons);
 
             Button install = ActionButton("INSTALL GPU DRIVERS", delegate { RunScript(@"GpuTools\Driver Install Latest.ps1"); }, true);
