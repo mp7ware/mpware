@@ -361,9 +361,9 @@ namespace mpwareLauncher
             grid.RowDefinitions.Add(new RowDefinition());
             page.Children.Add(grid);
 
-            AddDebloatTile(grid, 0, 0, "RECOMMENDED", "Keeps Store, Xbox and Edge. Best first-pass cleanup.", "Invoke-MpwareDebloatPreset -Preset Recommended");
-            AddDebloatTile(grid, 0, 1, "KEEP STORE", "Removes more apps but keeps Microsoft Store.", "Invoke-MpwareDebloatPreset -Preset KeepStore");
-            AddDebloatTile(grid, 1, 0, "FULL DEBLOAT", "Aggressive preset. Removes the most bundled apps.", "Invoke-MpwareDebloatPreset -Preset Full");
+            AddDebloatTile(grid, 0, 0, "RECOMMENDED", "Removes common bloat and Copilot. Keeps Microsoft Store, Xbox, and Edge.", "Invoke-MpwareDebloatPreset -Preset Recommended");
+            AddDebloatTile(grid, 0, 1, "KEEP STORE", "Recommended plus Xbox and Widgets cleanup. Keeps Microsoft Store.", "Invoke-MpwareDebloatPreset -Preset KeepStore");
+            AddDebloatTile(grid, 1, 0, "FULL DEBLOAT", "Aggressive preset. Removes Store, Xbox, Copilot, Widgets, and bundled apps.", "Invoke-MpwareDebloatPreset -Preset Full");
 
             RefreshNav();
         }
@@ -504,7 +504,7 @@ namespace mpwareLauncher
             warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability, compatibility issues, or security tradeoffs."));
             warningStack.Children.Add(Bullet("The bundled mpware powerplan is a managed tweak; it imports and activates the included .pow file."));
             warningStack.Children.Add(Bullet("Not responsible for any damage or data loss from using these scripts."));
-            warningStack.Children.Add(Bullet("Debloat removal is permanent - removed apps must be reinstalled from the Store or winget."));
+            warningStack.Children.Add(Bullet("Debloat removal is permanent. Removed apps must be reinstalled from Store, winget, or Windows setup media."));
             page.Children.Add(warnings);
 
             Grid two = new Grid();
@@ -520,7 +520,7 @@ namespace mpwareLauncher
                 "2. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED.",
                 "3. Registry apply opens a progress log, creates a Windows restore point, imports the selected patch, runs needed follow-up actions, and restarts Explorer.",
                 "4. PowerShell closes automatically when an action succeeds. If it fails, the window stays open so you can read the error.",
-                "5. NVIDIA, Debloater, and Cleanup are separate tools. They do not auto-create restore points; restart your PC after deeper changes."
+                "5. NVIDIA, Debloater, and Cleanup are separate tools. Restart your PC after deeper changes."
             }, "");
             two.Children.Add(how);
 
@@ -561,9 +561,6 @@ namespace mpwareLauncher
             stack.Children.Add(RiskLine("SAFE", _safe, "Well-tested tweaks, no realistic downside. Apply freely."));
             stack.Children.Add(RiskLine("MODERATE", _moderate, "May affect background functionality. Test after applying."));
             stack.Children.Add(RiskLine("ADVANCED", _advanced, "Can cause instability or security implications. Experienced users only."));
-            TextBlock note = Text("Registry tweaks get an automatic restore point. Debloat and cleanup actions do not, and app removal can be permanent.", 11, FontWeights.Normal, _muted);
-            note.Margin = new Thickness(0, 18, 0, 0);
-            stack.Children.Add(note);
             return stack;
         }
 
@@ -883,6 +880,7 @@ namespace mpwareLauncher
                 "  Write-Host 'mpware: starting NVIDIA driver helper with bundled Inspector profile...' -ForegroundColor Cyan;" +
                 "  & '" + PsEscape(script) + "';" +
                 "  Write-Host 'mpware: NVIDIA helper finished.' -ForegroundColor Green;" +
+                "  Write-Host ''; Read-Host 'Press Enter to close';" +
                 "} catch {" +
                 "  Write-Host ''; Write-Host 'mpware: NVIDIA helper failed:' -ForegroundColor Red;" +
                 "  Write-Host $_.Exception.Message -ForegroundColor Red;" +

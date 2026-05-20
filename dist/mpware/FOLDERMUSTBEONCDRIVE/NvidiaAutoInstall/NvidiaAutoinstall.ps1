@@ -377,7 +377,7 @@ function Get-FileFromWeb {
 }
 
 
-if (!(Check-Internet)) {
+if (Check-Internet) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Write-Status -Message 'Checking if 7zip is Installed...' -Type Output
     
@@ -1579,5 +1579,8 @@ if (!(Check-Internet)) {
     }
 
 
+}
+else {
+    throw 'No internet connection was detected. NVIDIA driver download cannot continue.'
 }
 
