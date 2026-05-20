@@ -368,6 +368,7 @@ namespace mpwareLauncher
 
             Button install = ActionButton("INSTALL GPU DRIVERS", delegate { RunScript(@"GpuTools\Driver Install Latest.ps1"); }, true);
             install.Height = 42;
+            install.Margin = new Thickness(0);
             install.HorizontalAlignment = HorizontalAlignment.Stretch;
             buttons.Children.Add(install);
 
