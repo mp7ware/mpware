@@ -1,4 +1,4 @@
-#nvidia driver auto installation script by mpware
+#nvidia driver auto installation script by zoic
 
 If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
     Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
@@ -6,37 +6,6 @@ If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 }
 
 $Global:tempDir = (([System.IO.Path]::GetTempPath())).trimend('\')
-
-function Disable-ConsoleQuickEdit {
-    try {
-        if (-not ('ConsoleMode.NativeMethods' -as [type])) {
-            Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-namespace ConsoleMode {
-    public static class NativeMethods {
-        [DllImport("kernel32.dll", SetLastError=true)]
-        public static extern IntPtr GetStdHandle(int nStdHandle);
-        [DllImport("kernel32.dll", SetLastError=true)]
-        public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out int lpMode);
-        [DllImport("kernel32.dll", SetLastError=true)]
-        public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int dwMode);
-    }
-}
-'@
-        }
-        $handle = [ConsoleMode.NativeMethods]::GetStdHandle(-10)
-        $mode = 0
-        if ([ConsoleMode.NativeMethods]::GetConsoleMode($handle, [ref]$mode)) {
-            $quickEdit = 0x0040
-            $extendedFlags = 0x0080
-            $newMode = ($mode -bor $extendedFlags) -band (-bnot $quickEdit)
-            [ConsoleMode.NativeMethods]::SetConsoleMode($handle, $newMode) | Out-Null
-        }
-    }
-    catch {}
-}
-Disable-ConsoleQuickEdit
 
 function Download-AppxPackage {
     param(
@@ -429,21 +398,6 @@ function Get-FileFromWeb {
 
 
 if (!(Check-Internet)) {
-    $nvidiaAdapter = $null
-    try {
-        $nvidiaAdapter = Get-CimInstance Win32_VideoController -ErrorAction Stop |
-        Where-Object { $_.Name -match 'NVIDIA' -or $_.PNPDeviceID -match 'VEN_10DE' } |
-        Select-Object -First 1
-    }
-    catch {}
-    if (-not $nvidiaAdapter) {
-        Write-Status -Message 'No NVIDIA display adapter was detected. If this is a virtual machine, the VM needs NVIDIA GPU passthrough or vGPU for the driver installer to work.' -Type Warning
-        $continueWithoutGpu = Custom-MsgBox -message 'No NVIDIA GPU was detected. Continue anyway?' -type Question
-        if ($continueWithoutGpu -ne 'OK') {
-            return
-        }
-    }
-
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Write-Status -Message 'Checking if 7zip is Installed...' -Type Output
     
@@ -555,59 +509,43 @@ if (!(Check-Internet)) {
     $response = Invoke-RestMethod -Uri $uri -UseBasicParsing
     $versions = $response.IDS.downloadInfo.Version  
 
+    #add html agility pack to parse html response
+    $dllPath = Search-File '*HtmlAgilityPack.dll'
+    Add-Type -Path $dllPath 
+    # NVIDIA API 
+    $searchUrl = 'https://www.nvidia.com/Download/processFind.aspx?psid=120&pfid=929&osid=57&lid=1&whql=1&lang=en-us&ctk=0&dtcid=1'
+    $response = Invoke-WebRequest -Uri $searchUrl -UseBasicParsing
+    $htmlDoc = New-Object HtmlAgilityPack.HtmlDocument
+    $htmlDoc.LoadHtml($response.Content)
+
+    $content = $htmlDoc.DocumentNode.InnerText
+
+    $sections = $content -split 'Release Highlights:'
+
+    # get the 4 latest highlights
+    $highlights = $sections[1..4]
+
+    # cleanup the text
     $releaseHighlights = @()
-    try {
-        # NVIDIA API 
-        $searchUrl = 'https://www.nvidia.com/Download/processFind.aspx?psid=120&pfid=929&osid=57&lid=1&whql=1&lang=en-us&ctk=0&dtcid=1'
-        $response = Invoke-WebRequest -Uri $searchUrl -UseBasicParsing -ErrorAction Stop
-        $content = $response.Content
-
-        # HtmlAgilityPack is optional. Fall back to a plain HTML strip when the DLL is not bundled.
-        $dllPath = Search-File '*HtmlAgilityPack.dll'
-        if ($dllPath -and (Test-Path -LiteralPath $dllPath)) {
-            Add-Type -Path $dllPath
-            $htmlDoc = New-Object HtmlAgilityPack.HtmlDocument
-            $htmlDoc.LoadHtml($response.Content)
-            $content = $htmlDoc.DocumentNode.InnerText
-        }
-        else {
-            $content = [System.Text.RegularExpressions.Regex]::Replace($content, '<[^>]+>', ' ')
-        }
-
-        $content = [System.Net.WebUtility]::HtmlDecode($content)
-        $sections = $content -split 'Release Highlights:'
-        if ($sections.Count -gt 1) {
-            $endIndex = [Math]::Min(4, $sections.Count - 1)
-            $highlights = $sections[1..$endIndex]
-
-            # cleanup the text
-            foreach ($highlight in $highlights) {
-                $trimmedHighlight = $highlight.Trim() -replace '\s+', ' '
-                $trimmedHighlight = $trimmedHighlight -replace 'Learn More in our Game Ready Driver article here. GeForce Game Ready Driver' , ''
-                $trimmedHighlight = $trimmedHighlight -replace '\[\d+\]' , '' #remove issue ids
-                $trimmedHighlight = $trimmedHighlight -replace '  ' , "`n" #move double space to a newline
-                $trimmedHighlight = $trimmedHighlight -replace 'WHQL \d{3}\.\d{2} [A-Za-z]+ \d{1,2}, \d{4}' , '' #remove driver version/release date
-                $releaseHighlights += $trimmedHighlight
-            }
-        }
+    foreach ($highlight in $highlights) {
+        $trimmedHighlight = $highlight.Trim() -replace '\s+', ' '
+        $trimmedHighlight = $trimmedHighlight -replace 'Learn More in our Game Ready Driver article here. GeForce Game Ready Driver&nbsp;' , ''
+        $trimmedHighlight = $trimmedHighlight -replace '&amp;' , '&'
+        $trimmedHighlight = $trimmedHighlight -replace '&ouml;' , 'o' #for god of ragnarok game
+        $trimmedHighlight = $trimmedHighlight -replace '\[\d+\]' , '' #remove issue ids
+        $trimmedHighlight = $trimmedHighlight -replace '  ' , "`n" #move double space to a newline
+        $trimmedHighlight = $trimmedHighlight -replace 'WHQL \d{3}\.\d{2} [A-Za-z]+ \d{1,2}, \d{4}' , '' #remove driver version/release date
+        $trimmedHighlight = $trimmedHighlight -replace '&nbsp;' , ' ' 
+        $trimmedHighlight = $trimmedHighlight -replace '&quot;' , '"' 
+        $trimmedHighlight = $trimmedHighlight -replace '&gt;' , '>' 
+        $releaseHighlights += $trimmedHighlight
     }
-    catch {
-        Write-Status -Message "Skipping NVIDIA release notes parser: $($_.Exception.Message)" -Type Warning
-    }
+
 
     if ($versions -eq $null) {
         Write-Status -Message 'UNABLE TO GET LATEST DRIVERS FROM NVIDIA API'  -Type Warning
         Write-Status -Message 'Use the Text Box Instead Ex. 551.86'  -Type Warning
         
-    }
-
-    if (-not $releaseHighlights -or $releaseHighlights.Count -eq 0) {
-        foreach ($version in @($versions)) {
-            $releaseHighlights += "Release highlights are unavailable for driver $version. You can still continue with the download/install workflow."
-        }
-        if ($releaseHighlights.Count -eq 0) {
-            $releaseHighlights += 'Release highlights are unavailable. Enter a driver version manually or select a local driver file.'
-        }
     }
 
     Add-Type -AssemblyName System.Windows.Forms
@@ -659,9 +597,7 @@ if (!(Check-Internet)) {
     $comboBox.BackColor = [System.Drawing.Color]::FromArgb(47, 49, 58)
     $comboBox.ForeColor = 'White'
     $versions | ForEach-Object { $comboBox.Items.Add($_) }
-    if ($comboBox.Items.Count -gt 0) {
-        $comboBox.SelectedIndex = 0
-    }
+    $comboBox.SelectedIndex = 0
     $form.Controls.Add($comboBox)
 
  
@@ -1008,10 +944,8 @@ if (!(Check-Internet)) {
         #uninstalling 7zip
         if ($7zinstalledAlr -eq $false) {
             $path = (Get-ChildItem -Path C:\ -Filter 7-Zip -Recurse -ErrorAction SilentlyContinue -Force | select-object -first 1).FullName
-            if ($path -and (Test-Path -LiteralPath (Join-Path $path 'Uninstall.exe'))) {
-                Start-Process (Join-Path $path 'Uninstall.exe') -wait -ArgumentList '/S'
-                remove-item 'HKLM:\SOFTWARE\7-Zip' -Force -Recurse -ErrorAction SilentlyContinue
-            }
+            Start-Process "$path\Uninstall.exe" -wait -ArgumentList '/S'
+            remove-item 'HKLM:\SOFTWARE\7-Zip' -Force -Recurse -ErrorAction SilentlyContinue
 
         }
 
@@ -1099,19 +1033,14 @@ if (!(Check-Internet)) {
 
     Write-Status -message 'Fixing Nvidia DRS Folder...' -type Output
     $path = "$env:ProgramData\NVIDIA Corporation\Drs"
-    if (Test-Path -LiteralPath $path) {
-        Get-ChildItem -LiteralPath $path -ErrorAction SilentlyContinue | ForEach-Object { Unblock-File $_.FullName -ErrorAction SilentlyContinue }
-    }
-    else {
-        Write-Status -message "NVIDIA DRS folder was not found at $path. This can happen before the NVIDIA driver/control panel initializes, or inside a VM without NVIDIA GPU passthrough/vGPU. Continuing without DRS cleanup." -type Warning
-    }
+    (Get-ChildItem -Path $path).FullName | Foreach-Object { Unblock-File $_ }
 
     #removes tray icon
     Reg.exe add 'HKCU\SOFTWARE\NVIDIA Corporation\NvTray' /v 'StartOnLogin' /t REG_DWORD /d '0' /f
     #new way
     Reg.exe add 'HKLM\SYSTEM\ControlSet001\Services\nvlddmkm\Parameters\Global\Startup\ForceStopNvTrayIcon' /ve /t REG_DWORD /d '1' /f
     Reg.exe add 'HKLM\SYSTEM\ControlSet001\Services\nvlddmkm\Parameters\Global\Startup\StartNvTray' /ve /t REG_DWORD /d '0' /f
-    $keys = Get-ChildItem -path 'HKCU:\Control Panel\NotifyIconSettings' -ErrorAction SilentlyContinue
+    $keys = Get-ChildItem -path 'HKCU:\Control Panel\NotifyIconSettings'
     foreach ($key in $keys) {
         $props = Get-ItemProperty $key.PSPath
         if ($props.executablepath -like '*NVDisplay.Container*') {
@@ -1122,8 +1051,8 @@ if (!(Check-Internet)) {
     #getting monitor ids and adding them to an array
     $monitorDevices = pnputil /enum-devices | Select-String -Pattern 'DISPLAY'
 
-    $dList = @()
     if ($monitorDevices) {
+        $dList = @()
     
         foreach ($device in $monitorDevices) {
             $deviceId = $device.ToString() -replace '^.*?DISPLAY\\(.*?)\\.*$', '$1'
@@ -1142,7 +1071,7 @@ if (!(Check-Internet)) {
     #adding saturation reg key paths to an array
     $paths = @()
     for ($i = 0; $i -lt $dList.Length; $i++) {
-        $paths += Get-ChildItem -Path 'registry::HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\nvlddmkm\State\DisplayDatabase\' -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*$($dList[$i])*" } | Select-Object -First 1
+        $paths += Get-ChildItem -Path 'registry::HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Services\nvlddmkm\State\DisplayDatabase\' | Where-Object { $_.Name -like "*$($dList[$i])*" } | Select-Object -First 1
 
     }
  
@@ -1306,7 +1235,7 @@ if (!(Check-Internet)) {
     $checkbox1.Text = 'Import NVCP Settings'
     $checkbox1.ForeColor = 'White'
     $checkbox1.BackColor = [System.Drawing.Color]::Transparent
-    $checkbox1.Checked = $false
+    $checkbox1.Checked = $true
     $Form.Controls.Add($checkbox1)  
     $TabPage1.Controls.Add($checkBox1)
 
@@ -1584,46 +1513,36 @@ if (!(Check-Internet)) {
             else {
                 $stockNip = Search-File '*DefaultProfile.nip'
             }
-            if (-not $stockNip -or -not (Test-Path -LiteralPath $stockNip)) {
-                Write-Status -message 'NVIDIA profile import skipped: DefaultProfile.nip was not found. Select a .nip file to import custom Inspector settings.' -type Warning
+            $dirPath = Split-Path $stockNip -Parent
+            #just to be sure
+            Remove-Item "$dirPath\Custom.nip" -Force -ErrorAction SilentlyContinue
+            Copy-Item $stockNip -Destination "$dirPath\Custom.nip" -Force
+
+            if ($radioButton1.Checked) {
+                #enable rebar
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983226' -settingValue '1' -valueType 'Dword'
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983227' -settingValue '1' -valueType 'Dword'
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983295' -settingValue 'AAAAQAAAAAA=' -valueType 'Binary'
             }
-            else {
-                $dirPath = Split-Path $stockNip -Parent
-                #just to be sure
-                Remove-Item "$dirPath\Custom.nip" -Force -ErrorAction SilentlyContinue
-                Copy-Item $stockNip -Destination "$dirPath\Custom.nip" -Force
+            if ($radioButton2.Checked) {
+                #enable gsync
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '278196567' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Toggle the VRR global feature'
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '278196727' -settingValue '1' -valueType 'Dword' -settingNameInfo 'VRR requested state'
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '279476687' -settingValue '0' -valueType 'Dword' -settingNameInfo 'G-SYNC'
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '294973784' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Enable G-SYNC globally'
+            }
 
-                if ($radioButton1.Checked) {
-                    #enable rebar
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983226' -settingValue '1' -valueType 'Dword'
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983227' -settingValue '1' -valueType 'Dword'
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '983295' -settingValue 'AAAAQAAAAAA=' -valueType 'Binary'
-                }
-                if ($radioButton2.Checked) {
-                    #enable gsync
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '278196567' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Toggle the VRR global feature'
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '278196727' -settingValue '1' -valueType 'Dword' -settingNameInfo 'VRR requested state'
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '279476687' -settingValue '0' -valueType 'Dword' -settingNameInfo 'G-SYNC'
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '294973784' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Enable G-SYNC globally'
-                }
-
-                if ($radioButton3.Checked) {
-                    #enable dlss latest
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '283385331' -settingValue '16777215' -valueType 'Dword' -settingNameInfo 'Override DLSS-SR presets'
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '283385345' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Enable DLSS-SR override'
-                    Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '6505105' -settingValue '1' -valueType 'Dword' -settingNameInfo 'DLSS Model Preset Profile'
-                }
+            if ($radioButton3.Checked) {
+                #enable dlss latest
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '283385331' -settingValue '16777215' -valueType 'Dword' -settingNameInfo 'Override DLSS-SR presets'
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '283385345' -settingValue '1' -valueType 'Dword' -settingNameInfo 'Enable DLSS-SR override'
+                Edit-Nip -nipPath "$dirPath\Custom.nip" -settingId '6505105' -settingValue '1' -valueType 'Dword' -settingNameInfo 'DLSS Model Preset Profile'
+            }          
            
-                $inspector = Search-File '*nvidiaProfileInspector.exe'
-                if (-not $inspector -or -not (Test-Path -LiteralPath $inspector)) {
-                    Write-Status -message 'NVIDIA profile import skipped: nvidiaProfileInspector.exe was not found.' -type Warning
-                }
-                else {
+            $inspector = Search-File '*nvidiaProfileInspector.exe'
         
-                    $arguments = '-silentImport', '-silent', "$dirPath\Custom.nip"
-                    & $inspector $arguments | Wait-Process
-                }
-            }
+            $arguments = '-silentImport', '-silent', "$dirPath\Custom.nip"
+            & $inspector $arguments | Wait-Process
 
             
         }
@@ -1740,6 +1659,4 @@ if (!(Check-Internet)) {
 
 
 }
-
-
 

@@ -328,9 +328,9 @@ namespace mpwareLauncher
 
             StackPanel stack = new StackPanel { Margin = new Thickness(28) };
             box.Child = stack;
-            stack.Children.Add(SectionTitle("LATEST NVIDIA DRIVER", "Downloads and opens the bundled clean-install helper."));
+            stack.Children.Add(SectionTitle("LATEST NVIDIA DRIVER", "Downloads the driver and applies the bundled NVIDIA Profile Inspector preset."));
             stack.Children.Add(InfoLine("Requires administrator approval."));
-            stack.Children.Add(InfoLine("The helper checks the current driver list and starts the install workflow."));
+            stack.Children.Add(InfoLine("Uses NvidiaAutoInstall\\DefaultProfile.nip and nvidiaProfileInspector.exe from the runtime folder."));
 
             Button install = ActionButton("DOWNLOAD AND INSTALL LATEST DRIVER", delegate { RunNvidiaDriverInstaller(); }, true);
             install.Height = 42;
@@ -862,25 +862,29 @@ namespace mpwareLauncher
                 return;
             }
 
-            string script = IOPath.Combine(_runtimeRoot, "NvidiaAutoinstall.ps1");
+            string nvidiaRoot = IOPath.Combine(_runtimeRoot, "NvidiaAutoInstall");
+            string script = IOPath.Combine(nvidiaRoot, "NvidiaAutoinstall.ps1");
             if (!File.Exists(script))
             {
-                MessageBox.Show("Missing runtime script: NvidiaAutoinstall.ps1", "mpware", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Missing runtime script: NvidiaAutoInstall\\NvidiaAutoinstall.ps1", "mpware", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             string command =
                 "$ErrorActionPreference='Stop';" +
                 "try {" +
-                "  Set-Location -LiteralPath '" + PsEscape(_runtimeRoot) + "';" +
+                "  Set-Location -LiteralPath '" + PsEscape(nvidiaRoot) + "';" +
                 "  $Global:folder='" + PsEscape(_runtimeRoot) + "';" +
+                "  $Global:nvidiaFolder='" + PsEscape(nvidiaRoot) + "';" +
                 "  $Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
                 "  $Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
                 "  $Global:iconDir=Join-Path $Global:folder 'mpwareIcons';" +
                 "  $Global:customIcon=Join-Path $Global:iconDir 'mp7.ico';" +
                 "  Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
                 "  Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
-                "  Write-Host 'mpware: starting NVIDIA driver helper...' -ForegroundColor Cyan;" +
+                "  if (-not (Test-Path -LiteralPath (Join-Path $Global:nvidiaFolder 'DefaultProfile.nip'))) { throw 'DefaultProfile.nip is missing' };" +
+                "  if (-not (Test-Path -LiteralPath (Join-Path $Global:nvidiaFolder 'nvidiaProfileInspector.exe'))) { throw 'nvidiaProfileInspector.exe is missing' };" +
+                "  Write-Host 'mpware: starting NVIDIA driver helper with bundled Inspector profile...' -ForegroundColor Cyan;" +
                 "  & '" + PsEscape(script) + "';" +
                 "  Write-Host 'mpware: NVIDIA helper finished.' -ForegroundColor Green;" +
                 "} catch {" +
@@ -1151,7 +1155,17 @@ namespace mpwareLauncher
         private string UltimatePowerPlanScript()
         {
             return
-                "Write-Host 'mpware: enabling Ultimate Performance power plan...' -ForegroundColor Cyan;" +
+                "Write-Host 'mpware: enabling bundled mpware power plan...' -ForegroundColor Cyan;" +
+                "if ([string]::IsNullOrWhiteSpace($Global:folder)) { throw 'runtime folder was not found' };" +
+                "$plan=Join-Path $Global:folder 'mpware powerplan.pow';" +
+                "if (Test-Path -LiteralPath $plan) {" +
+                "  $guid='ded574b5-45a0-4f42-8737-46345c09c238';" +
+                "  $list=powercfg /list 2>$null;" +
+                "  $exists=($list -match $guid);" +
+                "  if (-not $exists) { powercfg -import $plan $guid; if ($LASTEXITCODE -ne 0) { throw 'powercfg failed to import bundled mpware power plan' } };" +
+                "  powercfg /setactive $guid;" +
+                "  if ($LASTEXITCODE -ne 0) { throw 'powercfg failed to activate bundled mpware power plan' };" +
+                "} else {" +
                 "$ultimate='e9a42b02-d5df-448d-aa00-03f14749eb61';" +
                 "$guid=$null;" +
                 "$list=powercfg /list 2>$null;" +
@@ -1160,6 +1174,7 @@ namespace mpwareLauncher
                 "if (-not $guid) { $guid=$ultimate };" +
                 "powercfg /setactive $guid;" +
                 "if ($LASTEXITCODE -ne 0) { throw 'powercfg failed to activate Ultimate Performance' };" +
+                "};" +
                 "powercfg -h off | Out-Null;";
         }
 
@@ -1169,11 +1184,13 @@ namespace mpwareLauncher
                 "Write-Host 'mpware: enabling global timer resolution requests...' -ForegroundColor Cyan;" +
                 "New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Force | Out-Null;" +
                 "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Name 'GlobalTimerResolutionRequests' -Type DWord -Value 1 -Force;" +
-                "Write-Host 'mpware: installing SetTimerResolution startup task...' -ForegroundColor Cyan;" +
+                "Write-Host 'mpware: installing bundled TimerResolution.exe startup task...' -ForegroundColor Cyan;" +
                 "if ([string]::IsNullOrWhiteSpace($Global:folder)) { throw 'runtime folder was not found' };" +
                 "$timer=Join-Path $Global:folder 'SetTimerResolution.exe';" +
+                "$timerPayload=Join-Path $Global:folder 'TimerResolution\\TimerResolution.exe';" +
                 "if (Test-Path -LiteralPath $timer) {" +
-                "  & $timer --install --resolution 5000;" +
+                "  if (-not (Test-Path -LiteralPath $timerPayload)) { throw 'bundled TimerResolution.exe is missing' };" +
+                "  & $timer --install;" +
                 "  if ($LASTEXITCODE -ne 0) { throw 'mpware timer resolution helper failed with exit code ' + $LASTEXITCODE };" +
                 "  & schtasks.exe /Query /TN 'mpware SetTimerResolution' /FO LIST *> $null;" +
                 "  if ($LASTEXITCODE -ne 0) { throw 'mpware SetTimerResolution startup task was not registered' };" +
@@ -1324,12 +1341,12 @@ namespace mpwareLauncher
             TweakItem power = NewParsedTweak("MANAGED", "Enable Ultimate Performance power plan");
             power.Risk = "Moderate";
             power.ActionId = "ultimate-power-plan";
-            power.Description = "Activates Windows Ultimate Performance via powercfg and disables hibernation.";
+            power.Description = "Imports and activates the bundled mpware power plan via powercfg and disables hibernation.";
 
             TweakItem timer = NewParsedTweak("MANAGED", "Enable 0.5ms timer resolution helper");
             timer.Risk = "Moderate";
             timer.ActionId = "timer-resolution";
-            timer.Description = "Enables GlobalTimerResolutionRequests and installs a Task Scheduler startup task that requests 0.5ms timer resolution.";
+            timer.Description = "Enables GlobalTimerResolutionRequests and installs the bundled TimerResolution.exe as a Task Scheduler startup task.";
             AddRegEntry(timer, new RegEntry {
                 Section = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel",
                 ValueName = "\"GlobalTimerResolutionRequests\"",
@@ -1415,9 +1432,9 @@ namespace mpwareLauncher
         {
             string title = tweak.Name.ToLowerInvariant();
             if (String.Equals(tweak.ActionId, "ultimate-power-plan", StringComparison.OrdinalIgnoreCase))
-                return "Activates the built-in Windows Ultimate Performance power scheme and disables hibernation.";
+                return "Imports and activates the bundled mpware power plan and disables hibernation.";
             if (String.Equals(tweak.ActionId, "timer-resolution", StringComparison.OrdinalIgnoreCase))
-                return "Enables GlobalTimerResolutionRequests and installs SetTimerResolution.exe as a Task Scheduler startup task that requests 0.5ms timer resolution.";
+                return "Enables GlobalTimerResolutionRequests and installs the bundled TimerResolution.exe as a Task Scheduler startup task.";
             if (String.Equals(tweak.ActionId, "black-wallpaper", StringComparison.OrdinalIgnoreCase))
                 return "Sets the desktop wallpaper to a blank solid black background and refreshes Explorer visuals immediately.";
             if (String.Equals(tweak.ActionId, "black-taskbar", StringComparison.OrdinalIgnoreCase))

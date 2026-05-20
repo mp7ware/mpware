@@ -14,6 +14,6 @@ Changed in the mpware runtime:
 - PowerShell helper windows close automatically on success and stay open only when an error needs review.
 - Restore Changes is limited to registry tweak rollback.
 - Context-menu files are limited to shutdown/restart, run-as-admin, and kill non-responding tasks.
-- Managed registry-list actions now handle solid-black wallpaper refresh, Ultimate Performance activation, and 0.5ms timer-resolution setup.
+- Managed registry-list actions now handle solid-black wallpaper refresh, bundled power-plan import, and bundled TimerResolution.exe startup setup.
 - Automatic self-update into a different release channel is disabled.
 - Activation helpers, Defender-disable helpers, and PBO helper UI were removed from mpware.
