@@ -6,11 +6,13 @@ using System.Runtime.InteropServices;
 using System.Security;
 using System.Text;
 using System.Threading;
+using Microsoft.Win32;
 
 internal static class MpwareTimerResolution
 {
     private const string TaskName = "mpware SetTimerResolution";
     private const string LegacyTaskName = "mpware timer resolution";
+    private const string RunValueName = "mpware SetTimerResolution";
 
     [DllImport("ntdll.dll")]
     private static extern int NtSetTimerResolution(uint desiredResolution, bool setResolution, out uint currentResolution);
@@ -54,8 +56,9 @@ internal static class MpwareTimerResolution
         string xmlPath = Path.Combine(Path.GetTempPath(), "mpware-timer-resolution-task.xml");
         File.WriteAllText(xmlPath, BuildTaskXml(target, "--hold --resolution " + resolution), Encoding.Unicode);
         RunSchtasks("/Create /TN \"" + TaskName + "\" /XML \"" + xmlPath + "\" /F");
-        TryRunSchtasks("/Run /TN \"" + TaskName + "\"");
         TryRunSchtasks("/Delete /TN \"" + LegacyTaskName + "\" /F");
+        RegisterRunFallback(target, resolution);
+        TryRunSchtasks("/Run /TN \"" + TaskName + "\"");
         StartHidden(target, "--hold --resolution " + resolution);
         return 0;
     }
@@ -65,11 +68,26 @@ internal static class MpwareTimerResolution
         string xml = BuildTaskXml(@"C:\ProgramData\mpware\SetTimerResolution.exe", "--hold --resolution " + resolution);
         if (xml.IndexOf("<BootTrigger>", StringComparison.Ordinal) < 0 ||
             xml.IndexOf("<UserId>S-1-5-18</UserId>", StringComparison.Ordinal) < 0 ||
+            xml.IndexOf("<LogonType>ServiceAccount</LogonType>", StringComparison.Ordinal) < 0 ||
             xml.IndexOf("SetTimerResolution.exe", StringComparison.Ordinal) < 0)
         {
             return 2;
         }
         return 0;
+    }
+
+    private static void RegisterRunFallback(string target, uint resolution)
+    {
+        string command = "\"" + target + "\" --hold --resolution " + resolution;
+        using (RegistryKey machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
+        using (RegistryKey key = machine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+        {
+            if (key == null)
+            {
+                throw new InvalidOperationException("HKLM Run key was not available");
+            }
+            key.SetValue(RunValueName, command, RegistryValueKind.String);
+        }
     }
 
     private static int Hold(uint resolution)
@@ -145,6 +163,7 @@ internal static class MpwareTimerResolution
         xml.AppendLine("  <Principals>");
         xml.AppendLine("    <Principal id=\"Author\">");
         xml.AppendLine("      <UserId>S-1-5-18</UserId>");
+        xml.AppendLine("      <LogonType>ServiceAccount</LogonType>");
         xml.AppendLine("      <RunLevel>HighestAvailable</RunLevel>");
         xml.AppendLine("    </Principal>");
         xml.AppendLine("  </Principals>");

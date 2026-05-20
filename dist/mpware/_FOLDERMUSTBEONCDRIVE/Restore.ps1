@@ -1987,20 +1987,7 @@ Windows Registry Editor Version 5.00
 [HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Power]
 "SleepStudyDisabled"=-
 
-[-HKEY_CURRENT_USER\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32]
-
-[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity]
-"Enabled"=dword:00000001
-
-[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard]
-"EnableVirtualizationBasedSecurity"=dword:00000001
-"RequirePlatformSecurityFeatures"=dword:00000001
-
-[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\KernelShadowStacks]
-"Enabled"=dword:00000001
-
-[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\CredentialGuard]
-"Enabled"=dword:00000001
+[-HKEY_CURRENT_USER\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}]
 
 [HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\SmartActionPlatform\SmartClipboard]
 "Disabled"=-
@@ -2357,17 +2344,6 @@ Windows Registry Editor Version 5.00
     Write-Status -Message 'Enabling Windows Backup App...' -type output
     Reg.exe delete 'HKLM\SOFTWARE\Policies\Microsoft\MicrosoftAccount' /v 'DisableUserAuth' /f *>$null
   }
-
-  if ($checkbox15.Checked) {
-    Write-Status -Message 'Enabling HVCI/VBS...' -type output
-    Reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity' /v 'Enabled' /t REG_DWORD /d '1' /f
-    Reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard' /v 'EnableVirtualizationBasedSecurity' /t REG_DWORD /d '1' /f
-    Reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard' /v 'RequirePlatformSecurityFeatures' /t REG_DWORD /d '1' /f
-    Reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\KernelShadowStacks' /v 'Enabled' /t REG_DWORD /d '1' /f
-    Reg.exe add 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\CredentialGuard' /v 'Enabled' /t REG_DWORD /d '1' /f
-    Reg.exe delete 'HKLM\SYSTEM\ControlSet001\Control\Session Manager\kernel' /v 'MitigationOptions' /f *>$null
-  }
-
 
 }
 

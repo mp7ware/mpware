@@ -14,6 +14,14 @@ namespace mpwareLauncher
 {
     internal sealed class TerminalDashboardWindow : Window
     {
+        private const string CategoryGaming = "GAMING PERFORMANCE";
+        private const string CategoryNetwork = "NETWORK & LATENCY";
+        private const string CategoryPower = "CPU & POWER";
+        private const string CategoryPrivacy = "PRIVACY & TELEMETRY";
+        private const string CategoryVisual = "VISUAL & SHELL";
+        private const string CategoryWindows = "WINDOWS TWEAKS";
+        private const string CategoryContext = "CONTEXT MENU";
+
         private readonly Brush _background = BrushFromRgb(0, 0, 0);
         private readonly Brush _panel = BrushFromRgb(5, 5, 5);
         private readonly Brush _panelSoft = BrushFromRgb(10, 10, 10);
@@ -735,6 +743,7 @@ namespace mpwareLauncher
             string regPath = IOPath.Combine(IOPath.GetTempPath(), "mpware-selected-" + Guid.NewGuid().ToString("N") + ".reg");
             File.WriteAllText(regPath, BuildRegFile(selected), Encoding.Unicode);
             bool applyBlackWallpaper = HasSelectedAction(selected, "black-wallpaper");
+            bool applyBlackTaskbar = HasSelectedAction(selected, "black-taskbar") || applyBlackWallpaper;
             bool applyPowerPlan = HasSelectedAction(selected, "ultimate-power-plan");
             bool applyTimerResolution = HasSelectedAction(selected, "timer-resolution");
             string escapedRoot = PsEscape(_runtimeRoot ?? "");
@@ -752,6 +761,7 @@ namespace mpwareLauncher
                 "Write-Host 'mpware: importing selected registry tweaks with reg.exe...' -ForegroundColor Cyan;" +
                 "& reg.exe import $reg;" +
                 "if ($LASTEXITCODE -ne 0) { throw 'reg.exe import failed with exit code ' + $LASTEXITCODE };" +
+                (applyBlackTaskbar ? ProtectedFollowUpScript("black taskbar accent", BlackTaskbarScript()) : "") +
                 (applyBlackWallpaper ? ProtectedFollowUpScript("solid black desktop background", BlackWallpaperScript()) : "") +
                 (applyPowerPlan ? ProtectedFollowUpScript("Ultimate Performance power plan", UltimatePowerPlanScript()) : "") +
                 (applyTimerResolution ? ProtectedFollowUpScript("timer resolution boot helper", TimerResolutionScript()) : "") +
@@ -1081,6 +1091,28 @@ namespace mpwareLauncher
                 "1..5 | ForEach-Object { & rundll32.exe user32.dll,UpdatePerUserSystemParameters 1, True; Start-Sleep -Milliseconds 25 };";
         }
 
+        private string BlackTaskbarScript()
+        {
+            return
+                "Write-Host 'mpware: forcing black taskbar/accent color...' -ForegroundColor Cyan;" +
+                "$personalize='HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize';" +
+                "$accent='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Accent';" +
+                "$dwm='HKCU:\\Software\\Microsoft\\Windows\\DWM';" +
+                "New-Item -Path $personalize,$accent,$dwm -Force | Out-Null;" +
+                "Set-ItemProperty -Path $personalize -Name 'AppsUseLightTheme' -Type DWord -Value 0 -Force;" +
+                "Set-ItemProperty -Path $personalize -Name 'SystemUsesLightTheme' -Type DWord -Value 0 -Force;" +
+                "Set-ItemProperty -Path $personalize -Name 'ColorPrevalence' -Type DWord -Value 1 -Force;" +
+                "$palette=New-Object byte[] 32;" +
+                "Set-ItemProperty -Path $accent -Name 'AccentPalette' -Type Binary -Value $palette -Force;" +
+                "Set-ItemProperty -Path $accent -Name 'StartColorMenu' -Type DWord -Value 0 -Force;" +
+                "Set-ItemProperty -Path $accent -Name 'AccentColorMenu' -Type DWord -Value 0 -Force;" +
+                "Set-ItemProperty -Path $dwm -Name 'EnableWindowColorization' -Type DWord -Value 1 -Force;" +
+                "Set-ItemProperty -Path $dwm -Name 'ColorPrevalence' -Type DWord -Value 1 -Force;" +
+                "Set-ItemProperty -Path $dwm -Name 'AccentColor' -Type DWord -Value 0 -Force;" +
+                "Set-ItemProperty -Path $dwm -Name 'ColorizationColor' -Type DWord -Value 0 -Force;" +
+                "Set-ItemProperty -Path $dwm -Name 'ColorizationAfterglow' -Type DWord -Value 0 -Force;";
+        }
+
         private string UltimatePowerPlanScript()
         {
             return
@@ -1108,6 +1140,11 @@ namespace mpwareLauncher
                 "if (Test-Path -LiteralPath $timer) {" +
                 "  & $timer --install --resolution 5000;" +
                 "  if ($LASTEXITCODE -ne 0) { throw 'mpware timer resolution helper failed with exit code ' + $LASTEXITCODE };" +
+                "  & schtasks.exe /Query /TN 'mpware SetTimerResolution' /FO LIST *> $null;" +
+                "  if ($LASTEXITCODE -ne 0) { throw 'mpware SetTimerResolution boot task was not registered' };" +
+                "  $runFallback=(Get-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'mpware SetTimerResolution' -ErrorAction SilentlyContinue);" +
+                "  if (-not $runFallback) { throw 'mpware SetTimerResolution Run fallback was not registered' };" +
+                "  Write-Host 'mpware: SetTimerResolution boot task and Run fallback installed.' -ForegroundColor Green;" +
                 "} else {" +
                 "  Write-Host 'mpware: timer resolution helper missing; registry key was applied only.' -ForegroundColor Yellow;" +
                 "};";
@@ -1251,13 +1288,13 @@ namespace mpwareLauncher
         private void AddManagedTweaks()
         {
             TweakItem power = NewParsedTweak("MANAGED", "Enable Ultimate Performance power plan");
-            power.Category = "CPU & POWER";
+            power.Category = CategoryPower;
             power.Risk = "Moderate";
             power.ActionId = "ultimate-power-plan";
             power.Description = "Activates Windows Ultimate Performance via powercfg and disables hibernation.";
 
             TweakItem timer = NewParsedTweak("MANAGED", "Enable 0.5ms timer resolution helper");
-            timer.Category = "CPU & POWER";
+            timer.Category = CategoryPower;
             timer.Risk = "Moderate";
             timer.ActionId = "timer-resolution";
             timer.Description = "Enables GlobalTimerResolutionRequests and installs a hidden boot task that requests 0.5ms timer resolution.";
@@ -1298,13 +1335,13 @@ namespace mpwareLauncher
         private string CategoryForTitle(string source, string title)
         {
             string text = (source + " " + title).ToLowerInvariant();
-            if (text.IndexOf("context", StringComparison.Ordinal) >= 0 || text.IndexOf("menu", StringComparison.Ordinal) >= 0) return "CONTEXT MENU";
-            if (ContainsAny(text, "game", "xbox", "mouse", "gpu", "hags", "mmcss", "fullscreen", "foreground")) return "GAMING PERFORMANCE";
-            if (ContainsAny(text, "network", "tcp", "qos", "nagle", "throttling", "dns")) return "NETWORK & LATENCY";
-            if (ContainsAny(text, "privacy", "telemetry", "cortana", "advertising", "location", "camera", "contacts", "calendar", "diagnostic", "activity", "ai", "copilot")) return "PRIVACY & TELEMETRY";
-            if (ContainsAny(text, "dark", "theme", "taskbar", "start", "explorer", "snap", "search", "widgets", "transparency", "dpi", "sound", "visual", "desktop", "gallery", "home shortcut")) return "VISUAL & SHELL";
-            if (ContainsAny(text, "power", "hibernate", "sleep", "timer", "spectre", "meltdown", "memory", "core", "hpet", "priority")) return "CPU & POWER";
-            return "WINDOWS TWEAKS";
+            if (text.IndexOf("context", StringComparison.Ordinal) >= 0 || text.IndexOf("menu", StringComparison.Ordinal) >= 0) return CategoryContext;
+            if (ContainsAny(text, "game", "xbox", "mouse", "gpu", "hags", "mmcss", "fullscreen", "foreground")) return CategoryGaming;
+            if (ContainsAny(text, "network", "tcp", "qos", "nagle", "throttling", "dns")) return CategoryNetwork;
+            if (ContainsAny(text, "privacy", "telemetry", "cortana", "advertising", "location", "camera", "contacts", "calendar", "diagnostic", "activity", "ai", "copilot")) return CategoryPrivacy;
+            if (ContainsAny(text, "dark", "theme", "taskbar", "start", "explorer", "snap", "search", "widgets", "transparency", "dpi", "sound", "visual", "desktop", "gallery", "home shortcut")) return CategoryVisual;
+            if (ContainsAny(text, "power", "hibernate", "sleep", "timer", "spectre", "meltdown", "memory", "core", "hpet", "priority")) return CategoryPower;
+            return CategoryWindows;
         }
 
         private List<TweakItem> OrderedTweaks()
@@ -1329,20 +1366,20 @@ namespace mpwareLauncher
 
         private int CategoryRank(string category)
         {
-            if (String.Equals(category, "GAMING PERFORMANCE", StringComparison.Ordinal)) return 0;
-            if (String.Equals(category, "NETWORK & LATENCY", StringComparison.Ordinal)) return 1;
-            if (String.Equals(category, "CPU & POWER", StringComparison.Ordinal)) return 2;
-            if (String.Equals(category, "PRIVACY & TELEMETRY", StringComparison.Ordinal)) return 3;
-            if (String.Equals(category, "VISUAL & SHELL", StringComparison.Ordinal)) return 4;
-            if (String.Equals(category, "WINDOWS TWEAKS", StringComparison.Ordinal)) return 5;
-            if (String.Equals(category, "CONTEXT MENU", StringComparison.Ordinal)) return 6;
+            if (String.Equals(category, CategoryGaming, StringComparison.Ordinal)) return 0;
+            if (String.Equals(category, CategoryNetwork, StringComparison.Ordinal)) return 1;
+            if (String.Equals(category, CategoryPower, StringComparison.Ordinal)) return 2;
+            if (String.Equals(category, CategoryPrivacy, StringComparison.Ordinal)) return 3;
+            if (String.Equals(category, CategoryVisual, StringComparison.Ordinal)) return 4;
+            if (String.Equals(category, CategoryWindows, StringComparison.Ordinal)) return 5;
+            if (String.Equals(category, CategoryContext, StringComparison.Ordinal)) return 6;
             return 99;
         }
 
         private string RiskForTitle(string title)
         {
             string text = title.ToLowerInvariant();
-            if (ContainsAny(text, "uac", "user account control", "core isolation", "deviceguard", "credential", "spectre", "meltdown", "system requirements", "labconfig", "hpet")) return "Advanced";
+            if (ContainsAny(text, "uac", "user account control", "spectre", "meltdown", "system requirements", "labconfig", "hpet")) return "Advanced";
             if (ContainsAny(text, "network", "power", "hibernate", "timer", "driver", "privacy deny", "camera", "file system", "memory", "service")) return "Moderate";
             return "Safe";
         }
@@ -1353,6 +1390,10 @@ namespace mpwareLauncher
             if (ContainsAny(text, "set background black", "remove picture wallpaper", "set wallpaper to solid color"))
             {
                 return "black-wallpaper";
+            }
+            if (ContainsAny(text, "dark theme"))
+            {
+                return "black-taskbar";
             }
             return null;
         }
@@ -1386,8 +1427,8 @@ namespace mpwareLauncher
                 return "Enables GlobalTimerResolutionRequests and installs SetTimerResolution.exe as a hidden boot task that requests 0.5ms timer resolution.";
             if (String.Equals(tweak.ActionId, "black-wallpaper", StringComparison.OrdinalIgnoreCase))
                 return "Sets the desktop wallpaper to a blank solid black background and refreshes Explorer visuals immediately.";
-            if (ContainsAny(title, "core isolation", "vbs"))
-                return "Turns off virtualization-based security and memory integrity policy values. Can improve compatibility/performance but lowers hardening.";
+            if (String.Equals(tweak.ActionId, "black-taskbar", StringComparison.OrdinalIgnoreCase))
+                return "Enables dark mode and forces the Start/taskbar accent palette to solid black.";
             if (ContainsAny(title, "system requirements", "labconfig", "unsupported"))
                 return "Sets setup compatibility bypass values for unsupported Windows 11 hardware checks.";
             if (ContainsAny(title, "user account control", "uac"))
@@ -1430,6 +1471,8 @@ namespace mpwareLauncher
                 return "Changes Explorer, Start, and taskbar registry values for a cleaner Windows shell.";
             if (ContainsAny(title, "snap"))
                 return "Disables Windows snap layout, snap assist, and snap group shell behavior.";
+            if (ContainsAny(title, "classic desktop right-click menu"))
+                return "Adds the Windows 11 CLSID override that opens the classic desktop context menu by default.";
             if (ContainsAny(title, "file explorer", "quick access", "hidden files", "file name extensions", "folder type"))
                 return "Changes File Explorer registry values for visibility, navigation, or default folder behavior.";
             if (ContainsAny(title, "animations", "animate", "peek", "thumbnails", "visual", "best performance", "drop shadows", "smooth edges"))
