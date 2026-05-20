@@ -6,6 +6,9 @@ If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 }
 
 $Global:tempDir = (([System.IO.Path]::GetTempPath())).trimend('\')
+if (Get-Command Disable-MpwareConsoleQuickEdit -ErrorAction SilentlyContinue) {
+    Disable-MpwareConsoleQuickEdit
+}
 
 function Download-AppxPackage {
     param(
@@ -222,154 +225,34 @@ function Edit-Nip {
 
 
 
-# download file function source: https://gist.github.com/ChrisStro/37444dd012f79592080bd46223e27adc
-function Get-FileFromWeb {
-    param (
-        # Parameter help description
+function Save-FileFromWeb {
+    param(
         [Parameter(Mandatory)]
-        [string]$URL,
-  
-        # Parameter help description
+        [string]$Url,
         [Parameter(Mandatory)]
-        [string]$File 
+        [string]$File
     )
-    Begin {
-        function Show-Progress {
-            param (
-                # Enter total value
-                [Parameter(Mandatory)]
-                [Single]$TotalValue,
-        
-                # Enter current value
-                [Parameter(Mandatory)]
-                [Single]$CurrentValue,
-        
-                # Enter custom progresstext
-                [Parameter(Mandatory)]
-                [string]$ProgressText,
-        
-                # Enter value suffix
-                [Parameter()]
-                [string]$ValueSuffix,
-        
-                # Enter bar lengh suffix
-                [Parameter()]
-                [int]$BarSize = 40,
 
-                # show complete bar
-                [Parameter()]
-                [switch]$Complete
-            )
-            
-            # calc %
-            $percent = $CurrentValue / $TotalValue
-            $percentComplete = $percent * 100
-            if ($ValueSuffix) {
-                $ValueSuffix = " $ValueSuffix" # add space in front
-            }
-            if ($psISE) {
-                Write-Progress "$ProgressText $CurrentValue$ValueSuffix of $TotalValue$ValueSuffix" -id 0 -percentComplete $percentComplete            
-            }
-            else {
-                # build progressbar with string function
-                $curBarSize = $BarSize * $percent
-                $progbar = ''
-                $progbar = $progbar.PadRight($curBarSize, [char]9608)
-                $progbar = $progbar.PadRight($BarSize, [char]9617)
-        
-                if (!$Complete.IsPresent) {
-                    Write-Host -NoNewLine "`r$ProgressText $progbar [ $($CurrentValue.ToString('#.###').PadLeft($TotalValue.ToString('#.###').Length))$ValueSuffix / $($TotalValue.ToString('#.###'))$ValueSuffix ] $($percentComplete.ToString('##0.00').PadLeft(6)) % complete"
-                }
-                else {
-                    Write-Host -NoNewLine "`r$ProgressText $progbar [ $($TotalValue.ToString('#.###').PadLeft($TotalValue.ToString('#.###').Length))$ValueSuffix / $($TotalValue.ToString('#.###'))$ValueSuffix ] $($percentComplete.ToString('##0.00').PadLeft(6)) % complete"                    
-                }                
-            }   
-        }
+    $targetDirectory = [System.IO.Path]::GetDirectoryName($File)
+    if (-not [string]::IsNullOrWhiteSpace($targetDirectory) -and -not (Test-Path -LiteralPath $targetDirectory)) {
+        [System.IO.Directory]::CreateDirectory($targetDirectory) | Out-Null
     }
-    Process {
-        try {
-            $storeEAP = $ErrorActionPreference
-            $ErrorActionPreference = 'Stop'
-        
-            # invoke request
-            $request = [System.Net.HttpWebRequest]::Create($URL)
-            $response = $request.GetResponse()
-  
-            if ($response.StatusCode -eq 401 -or $response.StatusCode -eq 403 -or $response.StatusCode -eq 404) {
-                throw "Remote file either doesn't exist, is unauthorized, or is forbidden for '$URL'."
-            }
-  
-            if ($File -match '^\.\\') {
-                $File = Join-Path (Get-Location -PSProvider 'FileSystem') ($File -Split '^\.')[1]
-            }
-            
-            if ($File -and !(Split-Path $File)) {
-                $File = Join-Path (Get-Location -PSProvider 'FileSystem') $File
-            }
 
-            if ($File) {
-                $fileDirectory = $([System.IO.Path]::GetDirectoryName($File))
-                if (!(Test-Path($fileDirectory))) {
-                    [System.IO.Directory]::CreateDirectory($fileDirectory) | Out-Null
-                }
-            }
-
-            [long]$fullSize = $response.ContentLength
-            $fullSizeMB = $fullSize / 1024 / 1024
-  
-            # define buffer
-            [byte[]]$buffer = new-object byte[] 1048576
-            [long]$total = [long]$count = 0
-  
-            # create reader / writer
-            $reader = $response.GetResponseStream()
-            $writer = new-object System.IO.FileStream $File, 'Create'
-  
-            # start download
-            $finalBarCount = 0 #show final bar only one time
-            do {
-          
-                $count = $reader.Read($buffer, 0, $buffer.Length)
-          
-                $writer.Write($buffer, 0, $count)
-              
-                $total += $count
-                $totalMB = $total / 1024 / 1024
-          
-                if ($fullSize -gt 0) {
-                    Show-Progress -TotalValue $fullSizeMB -CurrentValue $totalMB -ProgressText "Downloading $($File.Name)" -ValueSuffix 'MB'
-                }
-
-                if ($total -eq $fullSize -and $count -eq 0 -and $finalBarCount -eq 0) {
-                    Show-Progress -TotalValue $fullSizeMB -CurrentValue $totalMB -ProgressText "Downloading $($File.Name)" -ValueSuffix 'MB' -Complete
-                    $finalBarCount++
-                    #Write-Host "$finalBarCount"
-                }
-
-            } while ($count -gt 0)
-        }
-  
-        catch {
-        
-            $ExeptionMsg = $_.Exception.Message
-            Write-Host "Download breaks with error : $ExeptionMsg"
-        }
-  
-        finally {
-            # cleanup
-            if ($reader) { $reader.Close() }
-            if ($writer) { $writer.Flush(); $writer.Close() }
-        
-            $ErrorActionPreference = $storeEAP
-            [GC]::Collect()
-        }    
+    $previousProgressPreference = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    try {
+        Write-Status -Message "Downloading $(Split-Path -Path $File -Leaf)..." -Type Output
+        Invoke-WebRequest -Uri $Url -OutFile $File -UseBasicParsing -ErrorAction Stop
+    }
+    finally {
+        $ProgressPreference = $previousProgressPreference
     }
 }
 
 
 if (Check-Internet) {
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Write-Status -Message 'Checking if 7zip is Installed...' -Type Output
+    Write-Status -Message 'Checking 7-Zip...' -Type Output
     
     $7zinstalledAlr = $false    
     $7zipinstalled = $false 
@@ -384,7 +267,7 @@ if (Check-Internet) {
         }    
     }
     else {
-        Write-Status -Message 'Installing 7zip...' -Type Output
+        Write-Status -Message 'Installing 7-Zip...' -Type Output
        
         $7zip = 'https://www.7-zip.org/a/7z2301-x64.exe'
         $output = "$tempDir\7Zip.exe"
@@ -453,8 +336,8 @@ if (Check-Internet) {
 
 
     if ($versions -eq $null) {
-        Write-Status -Message 'UNABLE TO GET LATEST DRIVERS FROM NVIDIA API'  -Type Warning
-        Write-Status -Message 'Use the Text Box Instead Ex. 551.86'  -Type Warning
+        Write-Status -Message 'Could not reach the NVIDIA release feed.'  -Type Warning
+        Write-Status -Message 'Use the version box instead, for example 551.86.'  -Type Warning
         
     }
 
@@ -554,7 +437,7 @@ if (Check-Internet) {
     $label.Size = New-Object System.Drawing.Size(130, 30)
     $label.ForeColor = 'White'
     $label.ForeColor = $accentColor
-    $label.Text = 'DRIVER NOT LISTED'
+    $label.Text = 'OTHER DRIVER SOURCE'
     $label.BackColor = [System.Drawing.Color]::Transparent
     $label.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
     $form.Controls.Add($label)
@@ -563,7 +446,7 @@ if (Check-Internet) {
     $label2.Location = New-Object System.Drawing.Point(20, 343)
     $label2.Size = New-Object System.Drawing.Size(130, 30)
     $label2.ForeColor = 'White'
-    $label2.Text = 'Enter version number:'
+    $label2.Text = 'Version number'
     $label2.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($label2)
 
@@ -579,27 +462,27 @@ if (Check-Internet) {
     $label4.Location = New-Object System.Drawing.Point(20, 382)
     $label4.Size = New-Object System.Drawing.Size(90, 30)
     $label4.ForeColor = 'White'
-    $label4.Text = 'Select driver file:'
+    $label4.Text = 'Local driver file'
     $label4.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($label4)
 
     $textboxCustom = New-Object System.Windows.Forms.TextBox
     $textboxCustom.Location = New-Object System.Drawing.Point(150, 340)
     $textboxCustom.Size = New-Object System.Drawing.Size(80, 20)
-    $textboxCustom.Text = 'Ex. 420.69'
+    $textboxCustom.Text = 'e.g. 420.69'
     $textboxCustom.ForeColor = 'White'
     $textboxCustom.BackColor = $inputColor
     $textboxCustom.MaxLength = 8
     $form.Controls.Add($textboxCustom)
     $textboxCustom.Add_TextChanged({
-            if ($textboxCustom.Text -ne 'Ex. 420.69' -and $textboxCustom.Text -ne '') {
+            if ($textboxCustom.Text -ne 'e.g. 420.69' -and $textboxCustom.Text -ne '') {
                 $comboBox.SelectedIndex = -1
             }
         })
 
     $tooltip1 = New-Object System.Windows.Forms.ToolTip
     $tooltip1.SetToolTip($textboxCustom, 'Add, hf to the end for HotFix drivers
-    Ex. 420.69hf')
+    e.g. 420.69hf')
 
     $textboxCustom2 = New-Object System.Windows.Forms.TextBox
     $textboxCustom2.Location = New-Object System.Drawing.Point(120, 380)
@@ -653,7 +536,7 @@ if (Check-Internet) {
     $laptop = $false
 
     if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-        if ($textboxCustom.Text -ne 'Ex. 420.69' -and $textboxCustom.Text -ne '') {
+        if ($textboxCustom.Text -ne 'e.g. 420.69' -and $textboxCustom.Text -ne '') {
             $selectedDriver = $textboxCustom.Text
         }
         elseif ($textboxCustom2.Text -ne '' -and (Test-Path $textboxCustom2.Text)) {
@@ -674,7 +557,10 @@ if (Check-Internet) {
 
         
         if ($selectedDriver) {
-            Write-Status -Message 'INSTALLING FILES'  -Type Output
+            if (Get-Command Disable-MpwareConsoleQuickEdit -ErrorAction SilentlyContinue) {
+                Disable-MpwareConsoleQuickEdit
+            }
+            Write-Status -Message 'Preparing driver package...'  -Type Output
             # Checking Windows bitness
             if ([Environment]::Is64BitOperatingSystem) {
                 $windowsArchitecture = '64bit'
@@ -722,7 +608,7 @@ if (Check-Internet) {
 
             }
 
-            Get-FileFromWeb -URL $url -File "C:\$selectedDriver.exe"
+            Save-FileFromWeb -Url $url -File "C:\$selectedDriver.exe"
         }
         
         New-item -Path "$env:USERPROFILE\AppData\Local\Temp\NVCleanstall" -ItemType Directory -Force
@@ -763,7 +649,7 @@ if (Check-Internet) {
     
         }
         else {
-            Write-Status -Message '7zip not installed '  -Type Error
+            Write-Status -Message '7-Zip is not available.'  -Type Error
      
             Start-Sleep 3
             throw '7-Zip could not be installed or detected.'
@@ -844,12 +730,12 @@ if (Check-Internet) {
         }
 
 
-        Write-Status -Message 'Installing Driver...'  -Type Output
+        Write-Status -Message 'Installing NVIDIA driver...'  -Type Output
    
         #starting setup.exe in current directory (%temp%)
         Start-Process "$env:USERPROFILE\AppData\Local\Temp\NVCleanstall\setup.exe" -WorkingDirectory "$env:USERPROFILE\AppData\Local\Temp\NVCleanstall" -ArgumentList '-clean -s' -wait 
         Clear-Host
-        Write-Status -Message 'Driver installed, Cleaning up...'  -Type Output
+        Write-Status -Message 'Driver install finished. Cleaning up...'  -Type Output
    
         #cleaning up
         Remove-Item "$env:USERPROFILE\AppData\Local\Temp\NVCleanstall" -Recurse -Force

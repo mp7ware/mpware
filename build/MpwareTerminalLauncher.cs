@@ -173,7 +173,7 @@ namespace mpwareLauncher
             StackPanel promptStack = new StackPanel { Margin = new Thickness(14, 10, 14, 10) };
             promptBox.Child = promptStack;
             promptStack.Children.Add(Text("> mpware.exe launches as Administrator and opens a progress log while applying changes.", 11, FontWeights.Bold, _accent));
-            promptStack.Children.Add(Text("  Selected tweaks create a Windows restore point first, apply registry values, skip already-missing delete targets, then verify the selected keys.", 11, FontWeights.Normal, _muted));
+            promptStack.Children.Add(Text("  Selected tweaks create a restore point first, import the chosen registry values, skip already-missing delete targets, and verify the entries afterward.", 11, FontWeights.Normal, _muted));
             page.Children.Add(promptBox);
 
             Grid actions = new Grid();
@@ -321,17 +321,17 @@ namespace mpwareLauncher
 
         private void ShowNvidiaDriver(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("NVIDIA DRIVER TOOL", "One action for latest graphics driver installation.", 720);
+            StackPanel page = BeginPage("NVIDIA DRIVER TOOL", "Latest Game Ready driver install with the bundled NVIDIA Inspector preset.", 720);
 
             Border box = Box(_border);
             page.Children.Add(box);
 
             StackPanel stack = new StackPanel { Margin = new Thickness(28) };
             box.Child = stack;
-            stack.Children.Add(SectionTitle("LATEST NVIDIA DRIVER", "Downloads the driver and applies the bundled NVIDIA Profile Inspector preset."));
+            stack.Children.Add(SectionTitle("LATEST NVIDIA DRIVER", "Downloads the driver, installs it in the current Windows session, and applies the bundled Inspector preset."));
             stack.Children.Add(InfoLine("Requires administrator approval."));
             stack.Children.Add(InfoLine("Uses NvidiaAutoInstall\\DefaultProfile.nip and nvidiaProfileInspector.exe from the runtime folder."));
-            stack.Children.Add(InfoLine("The old safe-mode handoff is disabled so the driver install continues in the same run."));
+            stack.Children.Add(InfoLine("The helper closes automatically after a successful run and stays open only if it needs your attention."));
 
             Button install = ActionButton("DOWNLOAD AND INSTALL LATEST DRIVER", delegate { RunNvidiaDriverInstaller(); }, true);
             install.Height = 42;
@@ -395,14 +395,14 @@ namespace mpwareLauncher
 
         private void ShowDebloater(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("WINDOWS DEBLOATER", "Simple presets for removing bundled Windows apps.", 820);
+            StackPanel page = BeginPage("WINDOWS DEBLOATER", "One recommended preset for removing bundled Windows apps.", 820);
 
             Border warning = Box(_danger);
             warning.Margin = new Thickness(0, 0, 0, 22);
             StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
             warning.Child = warningStack;
             warningStack.Children.Add(Text("/!\\ Debloat changes are permanent", 15, FontWeights.Bold, _danger));
-            warningStack.Children.Add(Text("Removed Store apps usually need to be reinstalled from Microsoft Store or winget. mpware only auto-creates restore points before registry tweak imports.", 11, FontWeights.Bold, _text));
+            warningStack.Children.Add(Text("Debloat removals are permanent. mpware only auto-creates restore points before Registry Tweaks, not before Debloater or Cleanup actions.", 11, FontWeights.Bold, _text));
             page.Children.Add(warning);
 
             Border box = Box(_border);
@@ -426,14 +426,14 @@ namespace mpwareLauncher
 
         private void ShowCleanup(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("CLEANUP", "Simple cleanup picker with a visible progress log.", 760);
+            StackPanel page = BeginPage("CLEANUP", "Simple cache and log cleanup with a visible progress log.", 760);
 
             Border warning = Box(_moderate);
             warning.Margin = new Thickness(0, 0, 0, 22);
             StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
             warning.Child = warningStack;
             warningStack.Children.Add(Text("/!\\ Cleanup removes selected caches, logs, and temporary files.", 15, FontWeights.Bold, _moderate));
-            warningStack.Children.Add(Text("The cleanup window is simplified to CHECK ALL and CLEAN. Create a manual restore point first if you want rollback coverage.", 11, FontWeights.Bold, _text));
+            warningStack.Children.Add(Text("The cleanup window is simplified to CHECK ALL and CLEAN. Unsupported Event Viewer channels are skipped automatically.", 11, FontWeights.Bold, _text));
             page.Children.Add(warning);
 
             Border box = Box(_border);
@@ -443,7 +443,7 @@ namespace mpwareLauncher
             box.Child = stack;
             stack.Children.Add(SectionTitle("CLEANUP", "Pick cleanup targets, then run them from one compact window."));
             stack.Children.Add(InfoLine("Only two actions are shown in the cleanup window: CHECK ALL and CLEAN."));
-            stack.Children.Add(InfoLine("A restart may be useful after cleanup."));
+            stack.Children.Add(InfoLine("A restart is optional, but it can help finish cache cleanup."));
 
             Button run = ActionButton("OPEN CLEANUP", delegate { RunFunctionWithVisibleConsole("Show-MpwareCleanup"); }, true);
             run.Height = 40;
@@ -456,16 +456,16 @@ namespace mpwareLauncher
 
         private void ShowRestoreTweaks(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("RESTORE TWEAKS", "Undo and repair helpers live separately from registry patching.", 760);
+            StackPanel page = BeginPage("RESTORE TWEAKS", "Remove registry values that were added by the bundled tweak file.", 760);
 
             Border box = Box(_border);
             page.Children.Add(box);
 
             StackPanel stack = new StackPanel { Margin = new Thickness(24) };
             box.Child = stack;
-            stack.Children.Add(SectionTitle("RESTORE CENTER", "Open the bundled restore tool for the current registry tweak bundle."));
-            stack.Children.Add(InfoLine("This restore window now only exposes registry tweak rollback."));
-            stack.Children.Add(InfoLine("Debloat removals and cleanup actions may still require reinstalling apps or restoring Windows manually."));
+            stack.Children.Add(SectionTitle("RESTORE CENTER", "Open the bundled rollback tool for the current Registry Tweaks bundle."));
+            stack.Children.Add(InfoLine("This window removes registry values that mpware added, then refreshes Explorer."));
+            stack.Children.Add(InfoLine("Debloat removals and cleanup actions still need manual reinstall or Windows restore if you want them undone."));
 
             Button open = ActionButton("OPEN RESTORE CENTER", delegate { RunScript("Restore.ps1"); }, true);
             open.Height = 40;
@@ -507,7 +507,7 @@ namespace mpwareLauncher
 
         private void ShowAbout(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation and important warnings.", 980);
+            StackPanel page = BeginPage("ABOUT MPWARE", "Documentation, warnings, and the intended workflow.", 980);
 
             Border banner = Box(_border);
             banner.Height = 230;
@@ -567,7 +567,7 @@ namespace mpwareLauncher
             warningStack.Children.Add(Bullet("PowerShell closes automatically after successful actions and stays open only if an error needs review."));
             warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability, compatibility issues, or security tradeoffs."));
             warningStack.Children.Add(Bullet("The bundled mpware powerplan is a managed tweak; it imports and activates the included .pow file."));
-            warningStack.Children.Add(Bullet("Not responsible for any damage or data loss from using these scripts."));
+            warningStack.Children.Add(Bullet("Review every change before you run it. Use the tool at your own risk."));
             warningStack.Children.Add(Bullet("Debloat removal is permanent. Removed apps must be reinstalled from Store, winget, or Windows setup media."));
             page.Children.Add(warnings);
 
@@ -576,7 +576,7 @@ namespace mpwareLauncher
             how.Child = AboutPanel("HOW TO USE MPWARE.EXE", new string[] {
                 "1. Run mpware.exe and approve the Administrator prompt.",
                 "2. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED.",
-                "3. Registry apply opens a progress log, creates a Windows restore point, imports the selected patch, runs needed follow-up actions, and restarts Explorer.",
+                "3. Registry apply opens a progress log, creates a restore point, imports the selected patch, runs the required follow-up actions, and restarts Explorer.",
                 "4. NVIDIA Driver, Programs, Debloater, and Cleanup each open their own helper window and close automatically after a successful run.",
                 "5. If an action fails, the PowerShell window stays open so you can read the error before closing it.",
                 "6. Restart your PC after deeper changes such as drivers, debloat, or larger registry batches."
@@ -937,6 +937,27 @@ namespace mpwareLauncher
             string path = IOPath.Combine(IOPath.GetTempPath(), "mpware-run-" + Guid.NewGuid().ToString("N") + ".ps1");
             string content =
                 "$ErrorActionPreference='Continue'" + Environment.NewLine +
+                "try {" + Environment.NewLine +
+                "  if (-not ('MpwareBootstrap.ConsoleMode' -as [type])) {" + Environment.NewLine +
+                "    Add-Type -Namespace MpwareBootstrap -Name ConsoleMode -MemberDefinition @'" + Environment.NewLine +
+                "using System;" + Environment.NewLine +
+                "using System.Runtime.InteropServices;" + Environment.NewLine +
+                "public static class ConsoleMode {" + Environment.NewLine +
+                "  [DllImport(\"kernel32.dll\", SetLastError = true)] public static extern IntPtr GetStdHandle(int nStdHandle);" + Environment.NewLine +
+                "  [DllImport(\"kernel32.dll\", SetLastError = true)] public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out int lpMode);" + Environment.NewLine +
+                "  [DllImport(\"kernel32.dll\", SetLastError = true)] public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int dwMode);" + Environment.NewLine +
+                "}" + Environment.NewLine +
+                "'@" + Environment.NewLine +
+                "  }" + Environment.NewLine +
+                "  $stdin = [MpwareBootstrap.ConsoleMode]::GetStdHandle(-10)" + Environment.NewLine +
+                "  if ($stdin -ne [IntPtr]::Zero -and $stdin.ToInt64() -ne -1) {" + Environment.NewLine +
+                "    $mode = 0" + Environment.NewLine +
+                "    if ([MpwareBootstrap.ConsoleMode]::GetConsoleMode($stdin, [ref]$mode)) {" + Environment.NewLine +
+                "      $mode = ($mode -bor 0x0080) -band (-bnot 0x0040) -band (-bnot 0x0020)" + Environment.NewLine +
+                "      [MpwareBootstrap.ConsoleMode]::SetConsoleMode($stdin, $mode) | Out-Null" + Environment.NewLine +
+                "    }" + Environment.NewLine +
+                "  }" + Environment.NewLine +
+                "} catch {}" + Environment.NewLine +
                 script + Environment.NewLine +
                 "Start-Sleep -Milliseconds 150" + Environment.NewLine +
                 "Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue" + Environment.NewLine;
