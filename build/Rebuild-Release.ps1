@@ -16,10 +16,8 @@ $zipPath = Join-Path $root 'dist\mpware.zip'
 $runtimeRoot = Join-Path $PackageRoot 'FOLDERMUSTBEONCDRIVE'
 $launcherSource = Join-Path $PSScriptRoot 'MpwareLauncher.cs'
 $terminalSource = Join-Path $PSScriptRoot 'MpwareTerminalLauncher.cs'
-$timerSource = Join-Path $PSScriptRoot 'MpwareTimerResolution.cs'
 $launcherManifest = Join-Path $PSScriptRoot 'MpwareLauncher.manifest'
 $launcherIcon = Join-Path $runtimeRoot 'mpwareIcons\mp7.ico'
-$timerExe = Join-Path $runtimeRoot 'SetTimerResolution.exe'
 
 if (-not (Test-Path -LiteralPath (Join-Path $runtimeRoot 'RegTweaks.txt'))) {
     throw "Missing runtime files: $runtimeRoot"
@@ -29,9 +27,6 @@ if (-not (Test-Path -LiteralPath $launcherSource)) {
 }
 if (-not (Test-Path -LiteralPath $terminalSource)) {
     throw "Missing terminal launcher source: $terminalSource"
-}
-if (-not (Test-Path -LiteralPath $timerSource)) {
-    throw "Missing timer helper source: $timerSource"
 }
 
 $csc = Get-Command csc.exe -ErrorAction SilentlyContinue
@@ -60,23 +55,6 @@ foreach ($ref in $wpfRefs) {
 
 $runtimeZip = Join-Path ([System.IO.Path]::GetTempPath()) "mpware-runtime-$([guid]::NewGuid().ToString('N')).zip"
 try {
-    $staleTimerExe = Join-Path $runtimeRoot 'mpware-timer-resolution.exe'
-    if (Test-Path -LiteralPath $staleTimerExe) {
-        Remove-Item -LiteralPath $staleTimerExe -Force
-    }
-
-    $timerArgs = @(
-        '/nologo',
-        '/target:winexe',
-        '/reference:System.ServiceProcess.dll',
-        "/out:$timerExe",
-        $timerSource
-    )
-    & $cscPath @timerArgs
-    if ($LASTEXITCODE -ne 0) {
-        throw "csc.exe failed to build timer helper with exit code $LASTEXITCODE"
-    }
-
     Compress-Archive -Path (Join-Path $runtimeRoot '*') -DestinationPath $runtimeZip -Force
 
     $cscArgs = @(

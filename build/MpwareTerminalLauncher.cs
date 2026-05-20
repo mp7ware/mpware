@@ -101,7 +101,7 @@ namespace mpwareLauncher
             nav.Children.Add(NavButton("Registry Tweaks", ShowRegistryTweaks));
             nav.Children.Add(NavButton("NVIDIA Driver", ShowNvidiaDriver));
             nav.Children.Add(NavButton("Debloater", ShowDebloater));
-            nav.Children.Add(NavButton("Ultimate Cleanup", ShowUltimateCleanup));
+            nav.Children.Add(NavButton("Cleanup", ShowCleanup));
             nav.Children.Add(NavButton("Restore Tweaks", ShowRestoreTweaks));
             nav.Children.Add(NavButton("About", ShowAbout));
 
@@ -331,6 +331,7 @@ namespace mpwareLauncher
             stack.Children.Add(SectionTitle("LATEST NVIDIA DRIVER", "Downloads the driver and applies the bundled NVIDIA Profile Inspector preset."));
             stack.Children.Add(InfoLine("Requires administrator approval."));
             stack.Children.Add(InfoLine("Uses NvidiaAutoInstall\\DefaultProfile.nip and nvidiaProfileInspector.exe from the runtime folder."));
+            stack.Children.Add(InfoLine("The old safe-mode handoff is disabled so the driver install continues in the same run."));
 
             Button install = ActionButton("DOWNLOAD AND INSTALL LATEST DRIVER", delegate { RunNvidiaDriverInstaller(); }, true);
             install.Height = 42;
@@ -360,23 +361,23 @@ namespace mpwareLauncher
             grid.RowDefinitions.Add(new RowDefinition());
             page.Children.Add(grid);
 
-            AddDebloatTile(grid, 0, 0, "RECOMMENDED", "Keeps Store, Xbox and Edge. Best first-pass cleanup.", "debloat -Autorun 1 -debloatSXE 1");
-            AddDebloatTile(grid, 0, 1, "KEEP STORE", "Removes more apps but keeps Microsoft Store.", "debloat -Autorun 1 -debloatS 1");
-            AddDebloatTile(grid, 1, 0, "FULL DEBLOAT", "Aggressive preset. Removes the most bundled apps.", "debloat -Autorun 1 -debloatAll 1");
+            AddDebloatTile(grid, 0, 0, "RECOMMENDED", "Keeps Store, Xbox and Edge. Best first-pass cleanup.", "Invoke-MpwareDebloatPreset -Preset Recommended");
+            AddDebloatTile(grid, 0, 1, "KEEP STORE", "Removes more apps but keeps Microsoft Store.", "Invoke-MpwareDebloatPreset -Preset KeepStore");
+            AddDebloatTile(grid, 1, 0, "FULL DEBLOAT", "Aggressive preset. Removes the most bundled apps.", "Invoke-MpwareDebloatPreset -Preset Full");
 
             RefreshNav();
         }
 
-        private void ShowUltimateCleanup(object sender, RoutedEventArgs e)
+        private void ShowCleanup(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("ULTIMATE CLEANUP", "Bundled cleanup workflow with a visible progress log.", 760);
+            StackPanel page = BeginPage("CLEANUP", "Simple cleanup picker with a visible progress log.", 760);
 
             Border warning = Box(_moderate);
             warning.Margin = new Thickness(0, 0, 0, 22);
             StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
             warning.Child = warningStack;
-            warningStack.Children.Add(Text("/!\\ Cleanup can remove logs, caches, temp files, and update leftovers.", 15, FontWeights.Bold, _moderate));
-            warningStack.Children.Add(Text("Cleanup opens in a visible progress console. Create a manual restore point first if you want rollback coverage for cleanup actions.", 11, FontWeights.Bold, _text));
+            warningStack.Children.Add(Text("/!\\ Cleanup removes selected caches, logs, and temporary files.", 15, FontWeights.Bold, _moderate));
+            warningStack.Children.Add(Text("The cleanup window is simplified to CHECK ALL and CLEAN. Create a manual restore point first if you want rollback coverage.", 11, FontWeights.Bold, _text));
             page.Children.Add(warning);
 
             Border box = Box(_border);
@@ -384,11 +385,11 @@ namespace mpwareLauncher
 
             StackPanel stack = new StackPanel { Margin = new Thickness(24) };
             box.Child = stack;
-            stack.Children.Add(SectionTitle("ULTIMATE CLEANUP SCRIPT", "Run the bundled cleanup module for temporary files, logs, cache folders, and cleanup targets."));
-            stack.Children.Add(InfoLine("Review the cleanup options in the opened window before running them."));
-            stack.Children.Add(InfoLine("A restart may be useful after deep cleanup or update-cache cleanup."));
+            stack.Children.Add(SectionTitle("CLEANUP", "Pick cleanup targets, then run them from one compact window."));
+            stack.Children.Add(InfoLine("Only two actions are shown in the cleanup window: CHECK ALL and CLEAN."));
+            stack.Children.Add(InfoLine("A restart may be useful after cleanup."));
 
-            Button run = ActionButton("OPEN ULTIMATE CLEANUP", delegate { RunFunctionWithVisibleConsole("UltimateCleanup"); }, true);
+            Button run = ActionButton("OPEN CLEANUP", delegate { RunFunctionWithVisibleConsole("Show-MpwareCleanup"); }, true);
             run.Height = 40;
             run.Margin = new Thickness(0, 24, 0, 0);
             run.HorizontalAlignment = HorizontalAlignment.Stretch;
@@ -501,7 +502,7 @@ namespace mpwareLauncher
             warningStack.Children.Add(Bullet("mpware.exe prompts for Administrator on launch."));
             warningStack.Children.Add(Bullet("PowerShell closes automatically after successful actions and stays open only if an error needs review."));
             warningStack.Children.Add(Bullet("Tweaks labeled Advanced may cause instability, compatibility issues, or security tradeoffs."));
-            warningStack.Children.Add(Bullet("The bundled power plan and TimerResolution service are managed tweaks; they change power/timer behavior beyond simple registry import."));
+            warningStack.Children.Add(Bullet("The bundled mpware powerplan is a managed tweak; it imports and activates the included .pow file."));
             warningStack.Children.Add(Bullet("Not responsible for any damage or data loss from using these scripts."));
             warningStack.Children.Add(Bullet("Debloat removal is permanent - removed apps must be reinstalled from the Store or winget."));
             page.Children.Add(warnings);
@@ -519,7 +520,7 @@ namespace mpwareLauncher
                 "2. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED.",
                 "3. Registry apply opens a progress log, creates a Windows restore point, imports the selected patch, runs needed follow-up actions, and restarts Explorer.",
                 "4. PowerShell closes automatically when an action succeeds. If it fails, the window stays open so you can read the error.",
-                "5. NVIDIA, Debloater, and Ultimate Cleanup are separate tools. They do not auto-create restore points; restart your PC after deeper changes."
+                "5. NVIDIA, Debloater, and Cleanup are separate tools. They do not auto-create restore points; restart your PC after deeper changes."
             }, "");
             two.Children.Add(how);
 
@@ -675,7 +676,6 @@ namespace mpwareLauncher
             bool applyBlackWallpaper = HasSelectedAction(selected, "black-wallpaper");
             bool applyBlackTaskbar = HasSelectedAction(selected, "black-taskbar") || applyBlackWallpaper;
             bool applyPowerPlan = HasSelectedAction(selected, "ultimate-power-plan");
-            bool applyTimerResolution = HasSelectedAction(selected, "timer-resolution");
             string escapedRoot = PsEscape(_runtimeRoot ?? "");
             string script =
                 "$ErrorActionPreference='Stop';" +
@@ -695,8 +695,7 @@ namespace mpwareLauncher
                 "if ($LASTEXITCODE -ne 0) { throw 'reg.exe import failed with exit code ' + $LASTEXITCODE };" +
                 (applyBlackTaskbar ? ProtectedFollowUpScript("black taskbar accent", BlackTaskbarScript()) : "") +
                 (applyBlackWallpaper ? ProtectedFollowUpScript("solid black desktop background", BlackWallpaperScript()) : "") +
-                (applyPowerPlan ? ProtectedFollowUpScript("bundled mpware power plan", UltimatePowerPlanScript()) : "") +
-                (applyTimerResolution ? ProtectedFollowUpScript("TimerResolution service", TimerResolutionScript()) : "") +
+                (applyPowerPlan ? ProtectedFollowUpScript("bundled mpware powerplan", UltimatePowerPlanScript()) : "") +
                 VerifyRegistryScript() +
                 "Write-Host 'mpware: restarting Explorer to refresh visible Windows settings...' -ForegroundColor Cyan;" +
                 "try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch { Write-Host ('mpware: explorer restart skipped: ' + $_.Exception.Message) -ForegroundColor Yellow };" +
@@ -878,8 +877,7 @@ namespace mpwareLauncher
                 "  $Global:nvidiaFolder='" + PsEscape(nvidiaRoot) + "';" +
                 "  $Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
                 "  $Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
-                "  Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
-                "  Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
+                "  . (Join-Path $Global:folder 'MpwareRuntime.ps1');" +
                 "  if (-not (Test-Path -LiteralPath (Join-Path $Global:nvidiaFolder 'DefaultProfile.nip'))) { throw 'DefaultProfile.nip is missing' };" +
                 "  if (-not (Test-Path -LiteralPath (Join-Path $Global:nvidiaFolder 'nvidiaProfileInspector.exe'))) { throw 'nvidiaProfileInspector.exe is missing' };" +
                 "  Write-Host 'mpware: starting NVIDIA driver helper with bundled Inspector profile...' -ForegroundColor Cyan;" +
@@ -932,8 +930,7 @@ namespace mpwareLauncher
                 "$Global:folder='" + escapedRoot + "';" +
                 "$Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
                 "$Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
-                "Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
-                "Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
+                "if (Test-Path -LiteralPath (Join-Path $Global:folder 'MpwareRuntime.ps1')) { . (Join-Path $Global:folder 'MpwareRuntime.ps1') };" +
                 "& '" + PsEscape(script) + "';";
             RunElevatedPowerShell(command, "launching " + relativeScript);
         }
@@ -957,8 +954,7 @@ namespace mpwareLauncher
                 "  $Global:folder='" + escapedRoot + "';" +
                 "  $Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
                 "  $Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
-                "  Import-Module (Join-Path $Global:folder 'zFunctions.psm1') -Force -Global;" +
-                "  Import-Module (Join-Path $Global:folder 'winfetch.psm1') -Force;" +
+                "  . (Join-Path $Global:folder 'MpwareRuntime.ps1');" +
                 "  Write-Host 'mpware: starting " + PsEscape(functionCall) + "...' -ForegroundColor Cyan;" +
                 "  " + functionCall + ";" +
                 "  Write-Host 'mpware: command finished.' -ForegroundColor Green;" +
@@ -1149,42 +1145,19 @@ namespace mpwareLauncher
         private string UltimatePowerPlanScript()
         {
             return
-                "Write-Host 'mpware: importing bundled mpware power plan...' -ForegroundColor Cyan;" +
+                "Write-Host 'mpware: importing bundled mpware powerplan...' -ForegroundColor Cyan;" +
                 "if ([string]::IsNullOrWhiteSpace($Global:folder)) { throw 'runtime folder was not found' };" +
                 "$plan=Join-Path $Global:folder 'mpware powerplan.pow';" +
                 "if (-not (Test-Path -LiteralPath $plan)) { throw 'bundled mpware powerplan.pow is missing' };" +
                 "$guid=$null;" +
                 "$out=powercfg -import $plan 2>&1;" +
-                "if ($LASTEXITCODE -ne 0) { throw ('powercfg failed to import bundled mpware power plan: ' + ($out -join ' ')) };" +
+                "if ($LASTEXITCODE -ne 0) { throw ('powercfg failed to import bundled mpware powerplan: ' + ($out -join ' ')) };" +
                 "foreach ($line in $out) { if ($line -match '([0-9a-fA-F-]{36})') { $guid=$matches[1]; break } };" +
                 "if (-not $guid) { $list=powercfg /list 2>$null; foreach ($line in $list) { if ($line -match '([0-9a-fA-F-]{36}).*mpware') { $guid=$matches[1]; break } } };" +
                 "if (-not $guid) { throw 'powercfg import did not return a plan GUID' };" +
+                "powercfg /changename $guid 'mpware powerplan' | Out-Null;" +
                 "powercfg /setactive $guid;" +
-                "if ($LASTEXITCODE -ne 0) { throw 'powercfg failed to activate imported mpware power plan' };";
-        }
-
-        private string TimerResolutionScript()
-        {
-            return
-                "Write-Host 'mpware: enabling global timer resolution requests...' -ForegroundColor Cyan;" +
-                "New-Item -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Force | Out-Null;" +
-                "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel' -Name 'GlobalTimerResolutionRequests' -Type DWord -Value 1 -Force;" +
-                "Write-Host 'mpware: installing bundled TimerResolution service...' -ForegroundColor Cyan;" +
-                "if ([string]::IsNullOrWhiteSpace($Global:folder)) { throw 'runtime folder was not found' };" +
-                "$timer=Join-Path $Global:folder 'SetTimerResolution.exe';" +
-                "$timerPayload=Join-Path $Global:folder 'TimerResolution\\TimerResolution.exe';" +
-                "if (Test-Path -LiteralPath $timer) {" +
-                "  if (-not (Test-Path -LiteralPath $timerPayload)) { throw 'bundled TimerResolution.exe is missing' };" +
-                "  $timerProcess=Start-Process -FilePath $timer -ArgumentList '--install' -Wait -PassThru;" +
-                "  if ($timerProcess.ExitCode -ne 0) { throw 'mpware timer resolution helper failed with exit code ' + $timerProcess.ExitCode };" +
-                "  $svc=Get-Service -Name 'mpwareTimerResolution' -ErrorAction SilentlyContinue;" +
-                "  if (-not $svc) { throw 'mpware TimerResolution service was not registered' };" +
-                "  for ($i=0; $i -lt 20 -and $svc.Status -ne 'Running'; $i++) { if ($svc.Status -eq 'Stopped') { Start-Service -Name 'mpwareTimerResolution' -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 500; $svc.Refresh() };" +
-                "  if ($svc.Status -ne 'Running') { throw 'mpware TimerResolution service is not running' };" +
-                "  Write-Host 'mpware: TimerResolution service installed and running.' -ForegroundColor Green;" +
-                "} else {" +
-                "  Write-Host 'mpware: timer resolution helper missing; registry key was applied only.' -ForegroundColor Yellow;" +
-                "};";
+                "if ($LASTEXITCODE -ne 0) { throw 'powercfg failed to activate imported mpware powerplan' };";
         }
 
         private string ProtectedFollowUpScript(string label, string script)
@@ -1323,20 +1296,10 @@ namespace mpwareLauncher
 
         private void AddManagedTweaks()
         {
-            TweakItem power = NewParsedTweak("MANAGED", "Enable bundled mpware power plan");
+            TweakItem power = NewParsedTweak("MANAGED", "Enable mpware powerplan");
             power.Risk = "Moderate";
             power.ActionId = "ultimate-power-plan";
-            power.Description = "Imports and activates the bundled mpware power plan via powercfg.";
-
-            TweakItem timer = NewParsedTweak("MANAGED", "Enable 0.5ms timer resolution helper");
-            timer.Risk = "Moderate";
-            timer.ActionId = "timer-resolution";
-            timer.Description = "Enables GlobalTimerResolutionRequests and installs the bundled TimerResolution.exe service.";
-            AddRegEntry(timer, new RegEntry {
-                Section = "HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\kernel",
-                ValueName = "\"GlobalTimerResolutionRequests\"",
-                ValueLine = "\"GlobalTimerResolutionRequests\"=dword:00000001"
-            });
+            power.Description = "Imports, renames, and activates the bundled mpware powerplan via powercfg.";
         }
 
         private bool HasSelectedAction(List<TweakItem> selected, string actionId)
@@ -1417,9 +1380,7 @@ namespace mpwareLauncher
         {
             string title = tweak.Name.ToLowerInvariant();
             if (String.Equals(tweak.ActionId, "ultimate-power-plan", StringComparison.OrdinalIgnoreCase))
-                return "Imports and activates the bundled mpware power plan without deleting or changing other plans.";
-            if (String.Equals(tweak.ActionId, "timer-resolution", StringComparison.OrdinalIgnoreCase))
-                return "Enables GlobalTimerResolutionRequests and installs the bundled TimerResolution.exe as a Windows service.";
+                return "Imports the bundled .pow file, renames it to mpware powerplan, and activates it without deleting other plans.";
             if (String.Equals(tweak.ActionId, "black-wallpaper", StringComparison.OrdinalIgnoreCase))
                 return "Sets the desktop wallpaper to a blank solid black background and refreshes Explorer visuals immediately.";
             if (String.Equals(tweak.ActionId, "black-taskbar", StringComparison.OrdinalIgnoreCase))

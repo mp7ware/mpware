@@ -60,24 +60,9 @@ namespace mpwareLauncher
                 return 6;
             }
 
-            if (!File.Exists(IOPath.Combine(root, "zFunctions.psm1")))
+            if (!File.Exists(IOPath.Combine(root, "MpwareRuntime.ps1")))
             {
                 return 3;
-            }
-
-            if (!File.Exists(IOPath.Combine(root, "winfetch.psm1")))
-            {
-                return 4;
-            }
-
-            if (!File.Exists(IOPath.Combine(root, "SetTimerResolution.exe")))
-            {
-                return 5;
-            }
-
-            if (!File.Exists(IOPath.Combine(root, "TimerResolution", "TimerResolution.exe")))
-            {
-                return 9;
             }
 
             if (!File.Exists(IOPath.Combine(root, "mpware powerplan.pow")))
@@ -98,16 +83,6 @@ namespace mpwareLauncher
             if (!File.Exists(IOPath.Combine(root, "NvidiaAutoInstall", "nvidiaProfileInspector.exe")))
             {
                 return 13;
-            }
-
-            if (!File.Exists(IOPath.Combine(root, "Unpin.ps1")))
-            {
-                return 7;
-            }
-
-            if (!File.Exists(IOPath.Combine(root, "EdgeRemove.ps1")))
-            {
-                return 8;
             }
 
             return 0;
