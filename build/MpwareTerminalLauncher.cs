@@ -900,7 +900,7 @@ namespace mpwareLauncher
             string tempScript = WriteTemporaryPowerShellScript(script);
             ProcessStartInfo psi = new ProcessStartInfo();
             psi.FileName = "powershell.exe";
-            psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + tempScript + "\"";
+            psi.Arguments = "-NoProfile -File \"" + tempScript + "\"";
             if (!String.IsNullOrWhiteSpace(_runtimeRoot))
             {
                 psi.WorkingDirectory = _runtimeRoot;
@@ -912,7 +912,9 @@ namespace mpwareLauncher
 
         private string WriteTemporaryPowerShellScript(string script)
         {
-            string path = IOPath.Combine(IOPath.GetTempPath(), "mpware-run-" + Guid.NewGuid().ToString("N") + ".ps1");
+            string runnerRoot = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "mpware", "runner");
+            Directory.CreateDirectory(runnerRoot);
+            string path = IOPath.Combine(runnerRoot, "launch-" + Guid.NewGuid().ToString("N") + ".ps1");
             string content =
                 "$ErrorActionPreference='Continue'" + Environment.NewLine +
                 "try {" + Environment.NewLine +
@@ -938,9 +940,7 @@ namespace mpwareLauncher
                 "    }" + Environment.NewLine +
                 "  }" + Environment.NewLine +
                 "} catch {}" + Environment.NewLine +
-                script + Environment.NewLine +
-                "Start-Sleep -Milliseconds 150" + Environment.NewLine +
-                "Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue" + Environment.NewLine;
+                script + Environment.NewLine;
             File.WriteAllText(path, content, new UTF8Encoding(false));
             return path;
         }

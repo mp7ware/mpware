@@ -1,8 +1,9 @@
 If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
-  Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
+  Start-Process PowerShell.exe -ArgumentList ("-NoProfile -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
   Exit
 }
 
+$ConfirmPreference = 'None'
 $ErrorActionPreference = 'Stop'
 $runtimePath = Join-Path $PSScriptRoot 'MpwareRuntime.ps1'
 if (Test-Path -LiteralPath $runtimePath) {
@@ -205,7 +206,7 @@ function Remove-MpwareEmptyRegistryKeys {
   foreach ($path in ($ProviderPaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object Length -Descending -Unique)) {
     try {
       if (Test-Path -LiteralPath $path) {
-        Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $path -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
       }
     }
     catch {
