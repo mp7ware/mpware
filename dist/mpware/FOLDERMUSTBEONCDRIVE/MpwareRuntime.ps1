@@ -98,6 +98,17 @@ function Test-MpwareWinget {
   return [bool](Get-Command winget.exe -ErrorAction SilentlyContinue)
 }
 
+function Test-MpwareElevated {
+  try {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+  }
+  catch {
+    return $false
+  }
+}
+
 function Open-MpwareUrl {
   param(
     [Parameter(Mandatory = $true)]
@@ -199,7 +210,21 @@ function Install-MpwareProgram {
       return
     }
     'Spotify' {
-      Invoke-MpwareWingetInstall -Id 'Spotify.Spotify' -DisplayName 'Spotify' -FallbackUrl 'https://www.spotify.com/download/windows/'
+      $spotifyUrl = 'https://www.spotify.com/download/windows/'
+
+      if (Test-MpwareElevated) {
+        Write-Status 'Spotify installs as a per-user app. Opening the official Spotify download page instead of running winget as administrator.' 'Warn'
+        Open-MpwareUrl -Url $spotifyUrl -Label 'Spotify'
+        return
+      }
+
+      try {
+        Invoke-MpwareWingetInstall -Id 'Spotify.Spotify' -DisplayName 'Spotify' -FallbackUrl $spotifyUrl
+      }
+      catch {
+        Write-Status "Spotify winget install failed. Opening the official download page instead. $($_.Exception.Message)" 'Warn'
+        Open-MpwareUrl -Url $spotifyUrl -Label 'Spotify'
+      }
       return
     }
   }
