@@ -20,25 +20,6 @@ function Check-Internet {
   }
 }
 
-function Search-File {
-  param([string]$filter)
-
-  $roots = @($Global:nvidiaFolder, $Global:folder, $PSScriptRoot) |
-    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-    Select-Object -Unique
-
-  foreach ($root in $roots) {
-    if (Test-Path -LiteralPath $root) {
-      $match = Get-ChildItem -LiteralPath $root -Recurse -File -Filter $filter -ErrorAction SilentlyContinue |
-        Select-Object -First 1
-      if ($match) {
-        return $match.FullName
-      }
-    }
-  }
-  return $null
-}
-
 function Disable-MpwareConsoleQuickEdit {
   try {
     if (-not ('MpwareNative.ConsoleMode' -as [type])) {

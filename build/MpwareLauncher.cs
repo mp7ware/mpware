@@ -70,17 +70,17 @@ namespace mpwareLauncher
                 return 10;
             }
 
-            if (!File.Exists(IOPath.Combine(root, "NvidiaAutoInstall", "NvidiaAutoinstall.ps1")))
+            if (!File.Exists(IOPath.Combine(root, "GpuTools", "Driver Install Latest.ps1")))
             {
                 return 11;
             }
 
-            if (!File.Exists(IOPath.Combine(root, "NvidiaAutoInstall", "DefaultProfile.nip")))
+            if (!File.Exists(IOPath.Combine(root, "GpuTools", "Nvidia Settings.ps1")))
             {
                 return 12;
             }
 
-            if (!File.Exists(IOPath.Combine(root, "NvidiaAutoInstall", "nvidiaProfileInspector.exe")))
+            if (!File.Exists(IOPath.Combine(root, "GpuTools", "Amd Settings.ps1")))
             {
                 return 13;
             }
