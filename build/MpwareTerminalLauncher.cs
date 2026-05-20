@@ -383,12 +383,13 @@ namespace mpwareLauncher
             StackPanel appStack = new StackPanel { Margin = new Thickness(24) };
             apps.Child = appStack;
             appStack.Children.Add(SectionTitle("APPS", "Install a few common desktop apps or open the official vendor page when needed."));
-            appStack.Children.Add(InfoLine("NVIDIA App opens the official NVIDIA page. Steam and Discord use winget with an official-site fallback."));
+            appStack.Children.Add(InfoLine("NVIDIA App opens the official NVIDIA page. Steam, Discord, and Spotify use winget with an official-site fallback."));
             appStack.Children.Add(BuildProgramsRow(new Button[]
             {
                 InstallCommandButton("NVIDIA APP", "Install-MpwareProgram -Name 'NVIDIA App'"),
                 InstallCommandButton("INSTALL STEAM", "Install-MpwareProgram -Name 'Steam'"),
-                InstallCommandButton("INSTALL DISCORD", "Install-MpwareProgram -Name 'Discord'")
+                InstallCommandButton("INSTALL DISCORD", "Install-MpwareProgram -Name 'Discord'"),
+                InstallCommandButton("INSTALL SPOTIFY", "Install-MpwareProgram -Name 'Spotify'")
             }));
 
             Border runtimes = Box(_border);
