@@ -1700,7 +1700,6 @@ function debloat {
     $form.StartPosition = 'CenterScreen'
     $form.BackColor = 'Black'
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-    $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
     # Sidebar Panel
     $sidebarPanel = New-Object System.Windows.Forms.Panel
@@ -3320,7 +3319,6 @@ function gpTweaks {
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
     $form.BackColor = 'Black'
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-    $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
     $url = 'https://github.com/MP7BDO/mpware/blob/main/features.md#group-policy-tweaks'
     $infobutton = New-Object System.Windows.Forms.Button
@@ -3367,10 +3365,8 @@ function gpTweaks {
         
       })
     $resetCheckedBttn.BackColor = [System.Drawing.Color]::Transparent
-    $image = [System.Drawing.Image]::FromFile("$Global:iconDir\restore.png")
-    $resizedImage = New-Object System.Drawing.Bitmap $image, 24, 25
-    $resetCheckedBttn.Image = $resizedImage
-    $resetCheckedBttn.ImageAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $resetCheckedBttn.Text = 'X'
+    $resetCheckedBttn.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $resetCheckedBttn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $resetCheckedBttn.FlatAppearance.BorderSize = 0
     $resetCheckedBttn.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::Transparent
@@ -3755,7 +3751,6 @@ function import-powerplan {
     $form.StartPosition = 'CenterScreen'
     $form.BackColor = 'Black'
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-    $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
     # Sidebar Panel
     $sidebarPanel = New-Object System.Windows.Forms.Panel
@@ -3869,10 +3864,8 @@ function import-powerplan {
         
       })
     $resetCheckedBttn.BackColor = 'Black'
-    $image = [System.Drawing.Image]::FromFile("$Global:iconDir\restore.png")
-    $resizedImage = New-Object System.Drawing.Bitmap $image, 24, 25
-    $resetCheckedBttn.Image = $resizedImage
-    $resetCheckedBttn.ImageAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $resetCheckedBttn.Text = 'X'
+    $resetCheckedBttn.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $resetCheckedBttn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $resetCheckedBttn.FlatAppearance.BorderSize = 0
     $sidebarPanel.Controls.Add($resetCheckedBttn)
@@ -4349,7 +4342,6 @@ function import-powerplan {
       $guid = New-Guid 
       powercfg -import ([string]$p) $guid     
       powercfg /setactive $guid 
-      powercfg -h off  
       if (!($Autorun)) {
         Custom-MsgBox -message 'Custom Power Plan Active!' -type None
       }
@@ -4369,7 +4361,6 @@ function import-powerplan {
       $guid = New-Guid 
       powercfg -import ([string]$p) $guid     
       powercfg /setactive $guid 
-      powercfg -h off 
       if (!($Autorun)) {
         Custom-MsgBox -message 'Custom AMD Power Plan Active!' -type None
       }
@@ -4383,7 +4374,6 @@ function import-powerplan {
         $guid = New-Guid 
         powercfg -import ([string]$planPath) $guid     
         powercfg /setactive $guid 
-        powercfg -h off 
 
         Custom-MsgBox -message 'Imported Power Plan Active!' -type None
       
@@ -4558,7 +4548,6 @@ function import-reg {
     $form3.StartPosition = 'CenterScreen'
     $form3.BackColor = 'Black'
     $form3.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-    $form3.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
     
     $startColor = [System.Drawing.Color]::FromArgb(18, 18, 18)   #rgb(61, 74, 102)
@@ -4617,14 +4606,7 @@ function import-reg {
     $pictureBox.Size = New-Object System.Drawing.Size(30, 20) 
     $pictureBox.BackColor = [System.Drawing.Color]::Transparent
     $pictureBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
-    $imagePath = "$iconDir\zSearchIcon.png"
-    try {
-      $image = [System.Drawing.Image]::FromFile($imagePath)
-    }
-    catch {
-      Write-Status -Message 'Missing Asset (Search Icon)' -Type Warning
-    }
-    $pictureBox.Image = $image
+    $pictureBox.Image = $null
     $form3.Controls.Add($pictureBox)
 
 
@@ -5893,7 +5875,6 @@ function OptionalTweaks {
     $form.StartPosition = 'CenterScreen'
     $form.BackColor = 'Black'
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-    $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
     $type = $form.GetType()
     $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
@@ -6008,10 +5989,8 @@ function OptionalTweaks {
         
       })
     $resetCheckedBttn.BackColor = 'Black'
-    $image = [System.Drawing.Image]::FromFile("$Global:iconDir\restore.png")
-    $resizedImage = New-Object System.Drawing.Bitmap $image, 24, 25
-    $resetCheckedBttn.Image = $resizedImage
-    $resetCheckedBttn.ImageAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $resetCheckedBttn.Text = 'X'
+    $resetCheckedBttn.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $resetCheckedBttn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $resetCheckedBttn.FlatAppearance.BorderSize = 0
     $sidebarPanel.Controls.Add($resetCheckedBttn)
@@ -7834,7 +7813,6 @@ function W11Tweaks {
     $form.StartPosition = 'CenterScreen'
     $form.BackColor = 'Black'
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-    $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
     # Sidebar Panel
     $sidebarPanel = New-Object System.Windows.Forms.Panel
@@ -7981,10 +7959,8 @@ function W11Tweaks {
         
       })
     $resetCheckedBttn.BackColor = 'Black'
-    $image = [System.Drawing.Image]::FromFile("$Global:iconDir\restore.png")
-    $resizedImage = New-Object System.Drawing.Bitmap $image, 24, 25
-    $resetCheckedBttn.Image = $resizedImage
-    $resetCheckedBttn.ImageAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $resetCheckedBttn.Text = 'X'
+    $resetCheckedBttn.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $resetCheckedBttn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $resetCheckedBttn.FlatAppearance.BorderSize = 0
     $sidebarPanel.Controls.Add($resetCheckedBttn)
@@ -8721,16 +8697,8 @@ Windows Registry Editor Version 5.00
     
     if ($checkbox9.Checked) {
       Write-Status -Message 'Replacing Recycle Bin Icon with Windows 10...' -Type Output
-      #get recycle bin icons (win 10)
-      $iconEmpty = Search-File '*RB_Empty.ico'
-      $iconFull = Search-File '*RB_Full.ico'
-      #move icons to appdata
-      New-Item -Path "$env:USERPROFILE\AppData\Local" -Name 'RecycleBinIcons' -ItemType Directory -Force
-      Move-Item -Path $iconEmpty -Destination "$env:USERPROFILE\AppData\Local\RecycleBinIcons" -Force
-      Move-Item -Path $iconFull -Destination "$env:USERPROFILE\AppData\Local\RecycleBinIcons" -Force
-      #update icon paths
-      $iconEmpty = "$env:USERPROFILE\AppData\Local\RecycleBinIcons\RB_Empty.ico"
-      $iconFull = "$env:USERPROFILE\AppData\Local\RecycleBinIcons\RB_Full.ico"
+      $iconEmpty = "$env:SystemRoot\System32\imageres.dll,-55"
+      $iconFull = "$env:SystemRoot\System32\imageres.dll,-54"
 
       $names = @('(Default)', 'full', 'empty')
 
@@ -9175,7 +9143,6 @@ function UltimateCleanup {
   $form.StartPosition = 'CenterScreen'
   $form.BackColor = 'Black'
   $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-  $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
   $type = $form.GetType()
   $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
@@ -9720,7 +9687,6 @@ function Custom-MsgBox {
   $form.BackColor = [System.Drawing.Color]::Black
   $form.ForeColor = [System.Drawing.Color]::White
   $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-  $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
   # Add Icon
   $pictureBox = New-Object System.Windows.Forms.PictureBox
@@ -9730,20 +9696,7 @@ function Custom-MsgBox {
   if ($type -eq 'Warning') {
     $imagePath = 'C:\Windows\System32\SecurityAndMaintenance_Alert.png'
   }
-  if ($type -eq 'Question') {
-    $imagePath = "$iconDir\questionIcon.png"
-  }
-  if ($type -eq 'None') {
-    $imagePath = "$iconDir\greencheckIcon.png"
-  }
-    
-  try {
-    $image = [System.Drawing.Image]::FromFile($imagePath)
-  }
-  catch {
-    Write-Status -Message 'Unable to Load Icon' -Type Error
-  }
-  $pictureBox.Image = $image
+  $pictureBox.Visible = $false
   $form.Controls.Add($pictureBox)
 
   # Create the label
@@ -10001,7 +9954,6 @@ function Install-Browsers {
   $form.Size = New-Object System.Drawing.Size(300, 200)
   $form.StartPosition = 'CenterScreen'
   $form.BackColor = [System.Drawing.Color]::Black
-  $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
   $type = $form.GetType()
   $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
@@ -10467,7 +10419,6 @@ function Display-Settings {
   $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
   $form.BackColor = 'Black'
   $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-  $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
   $type = $form.GetType()
   $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
