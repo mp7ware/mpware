@@ -1,4 +1,4 @@
-#nvidia driver auto installation script by zoic
+# mpware NVIDIA driver helper
 
 If (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]'Administrator')) {
     Start-Process PowerShell.exe -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -File `"{0}`"" -f $PSCommandPath) -Verb RunAs
@@ -232,26 +232,6 @@ function Edit-Nip {
 
 
 
-function Run-Trusted([String]$command) {
-
-    Stop-Service -Name TrustedInstaller -Force -ErrorAction SilentlyContinue
-    #get bin path to revert later
-    $service = Get-CimInstance -ClassName Win32_Service -Filter "Name='TrustedInstaller'"
-    $DefaultBinPath = $service.PathName
-    #convert command to base64 to avoid errors with spaces
-    $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
-    $base64Command = [Convert]::ToBase64String($bytes)
-    #change bin to command
-    sc.exe config TrustedInstaller binPath= "cmd.exe /c powershell.exe -encodedcommand $base64Command" | Out-Null
-    #run the command
-    sc.exe start TrustedInstaller | Out-Null
-    #set bin back to default
-    sc.exe config TrustedInstaller binpath= "`"$DefaultBinPath`"" | Out-Null
-    Stop-Service -Name TrustedInstaller -Force -ErrorAction SilentlyContinue
-
-}
-
-
 # download file function source: https://gist.github.com/ChrisStro/37444dd012f79592080bd46223e27adc
 function Get-FileFromWeb {
     param (
@@ -434,62 +414,7 @@ if (!(Check-Internet)) {
     }
     
 
-    #check if ddu is already installed before asking 
-    if (!(Test-Path "$folder\DDU v18.0.8.6\Display Driver Uninstaller.exe")) {
-        Write-Status -message "DDU Not Found in  $folder\DDU v18.0.8.6\Display Driver Uninstaller.exe" -type warning
-        #install ddu
-        $choice = Custom-MsgBox -message 'Install Display Driver Uninstaller?' -type Question
-
-        switch ($choice) {
-            'OK' {
-                Write-Status -Message 'Installing Display Driver Uninstaller...'  -Type Output
-        
-                Remove-Item "$tempDir\DDU.exe" -ErrorAction SilentlyContinue -Force
-                Remove-Item "$tempDir\DDU v18.0.8.6" -Recurse -Force -ErrorAction SilentlyContinue
-                $url = 'https://www.wagnardsoft.com/DDU/download/DDU%20v18.0.8.6.exe'  
-                $ProgressPreference = 'SilentlyContinue' 
-                try {
-                    Invoke-WebRequest -Uri $url -OutFile "$tempDir\DDU.exe" -ErrorAction Stop
-                }
-                catch {
-                    Write-Status -Message 'Unable to Install DDU Due to Download Error!'  -Type Error
-                    break
-                }
-            
-                Start-Process -FilePath $archiverProgram -NoNewWindow -ArgumentList "x -bso0 -bsp1 -bse1 -aoa `"$tempDir\DDU.exe`" -o`"$folder`"" -Wait
-            }
-        }
-    }
-    else {
-        Write-Status -message 'DDU Found...' -type output
-    }
-
-
-    if ((Test-Path "$folder\DDU v18.0.8.6\Display Driver Uninstaller.exe")) {
-        $choice2 = Custom-MsgBox -message 'Boot to Safe Mode to Run DDU (Recommended)?' -type Question
-   
-
-        if ($choice2 -eq 'OK') {
-            Write-Status -Message 'Booting to Safe Mode...'  -Type Output
-             
-            #add safe mode minimal
-            Start-process bcdedit.exe -ArgumentList '/set {current} safeboot minimal' 
-                
-            #create script to run on safe mode startup
-            $currentValue = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -Name 'Userinit').Userinit
-            $safeModeScript = "
-                Start-process bcdedit.exe -ArgumentList '/deletevalue safeboot'
-                Start-Process -FilePath `"$folder\DDU v18.0.8.6\Display Driver Uninstaller.exe`" -args `"-Restart -CleanNvidia -PreventWinUpdate -RemovePhysx -RemoveGFE -RemoveNVBROADCAST -RemoveNVCP`" -WindowStyle Hidden
-                Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -Name 'Userinit' -Value `"$currentValue`"
-                "
-            New-Item "$tempDir\safemodescript.ps1" -Value $safeModeScript -Force | Out-Null
-            #create winlogon key
-            $scriptRun = "powershell.exe -nop -ep bypass -f $tempDir\safemodescript.ps1"
-            Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon' -Name 'Userinit' -Value "$currentValue, $scriptRun" -Force
-            shutdown /f /r /t 0
-        }
-    
-    }
+    Write-Status -Message 'Skipping old safe-mode cleanup so the driver installer continues in this Windows session.' -Type Output
    
 
         
@@ -937,8 +862,6 @@ if (!(Check-Internet)) {
         Remove-Item "$env:USERPROFILE\AppData\Local\Temp\NVCleanstall" -Recurse -Force
         Remove-Item "$env:USERPROFILE\AppData\Local\Temp\NvidiaLogging" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item "C:\$selectedDriver.exe" -Force -ErrorAction SilentlyContinue
-        Remove-Item "$tempDir\DDU.exe" -ErrorAction SilentlyContinue -Force
-        Remove-Item "$tempDir\DDU v18.0.8.6" -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item "$tempDir\safemodescript.ps1" -Force -ErrorAction SilentlyContinue
         #uninstalling 7zip
         if ($7zinstalledAlr -eq $false) {
@@ -1611,7 +1534,7 @@ if (!(Check-Internet)) {
                 Write-Status -message 'Applying Digital Vibrance...' -type output
                 $path = $paths[$i]
                 $command = "Reg.exe add $path /v `"SaturationRegistryKey`" /t REG_DWORD /d $value /f"
-                Run-Trusted -command $command
+                cmd.exe /c $command | Out-Null
                 Start-Sleep 1
                 $i++
             }
@@ -1633,14 +1556,14 @@ if (!(Check-Internet)) {
                     $colorConfig[16] = 3
                     $hexValue = ($colorConfig | ForEach-Object { '{0:X2}' -f $_ }) -join ''
                     $command = "Reg.exe add $path /v `"ColorformatConfig`" /t REG_BINARY /d `"$hexValue`" /f"
-                    Run-Trusted -command $command
+                    cmd.exe /c $command | Out-Null
                     Start-Sleep 1
                 }
                 catch {
                     #value has not been set yet
                     $value = 'db02000014000000000a00080000000003010000'
                     $command = "Reg.exe add $path /v `"ColorformatConfig`" /t REG_BINARY /d `"$value`" /f"
-                    Run-Trusted -command $command
+                    cmd.exe /c $command | Out-Null
                     Start-Sleep 1
                 }
             

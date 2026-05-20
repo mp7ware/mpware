@@ -1,0 +1,248 @@
+function Write-Status {
+  param(
+    [string]$Message,
+    [string]$Type = 'Output'
+  )
+
+  $color = 'Cyan'
+  if ($Type -match 'warn') { $color = 'Yellow' }
+  if ($Type -match 'err') { $color = 'Red' }
+  if ($Type -match 'ok|done|success') { $color = 'Green' }
+  Write-Host "[+] $Message" -ForegroundColor $color
+}
+
+function Check-Internet {
+  try {
+    return [System.Net.NetworkInformation.NetworkInterface]::GetIsNetworkAvailable()
+  }
+  catch {
+    return $false
+  }
+}
+
+function Search-File {
+  param([string]$filter)
+
+  $roots = @($Global:nvidiaFolder, $Global:folder, $PSScriptRoot) |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+    Select-Object -Unique
+
+  foreach ($root in $roots) {
+    if (Test-Path -LiteralPath $root) {
+      $match = Get-ChildItem -LiteralPath $root -Recurse -File -Filter $filter -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+      if ($match) {
+        return $match.FullName
+      }
+    }
+  }
+  return $null
+}
+
+function Create-ModernButton {
+  param(
+    [string]$Text,
+    [System.Drawing.Point]$Location,
+    [System.Drawing.Size]$Size,
+    [scriptblock]$ClickAction,
+    $DialogResult,
+    [int]$borderSize = 1
+  )
+
+  $button = New-Object System.Windows.Forms.Button
+  $button.Text = $Text
+  if ($Location) { $button.Location = $Location }
+  if ($Size) { $button.Size = $Size }
+  if ($DialogResult) { $button.DialogResult = $DialogResult }
+  $button.BackColor = [System.Drawing.Color]::FromArgb(0, 200, 210)
+  $button.ForeColor = [System.Drawing.Color]::Black
+  $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+  $button.FlatAppearance.BorderSize = $borderSize
+  $button.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
+  if ($ClickAction) { $button.Add_Click($ClickAction) }
+  return $button
+}
+
+function Custom-MsgBox {
+  param(
+    [string]$message,
+    [string]$type = 'None'
+  )
+
+  Add-Type -AssemblyName System.Windows.Forms
+  $buttons = [System.Windows.Forms.MessageBoxButtons]::OK
+  $icon = [System.Windows.Forms.MessageBoxIcon]::Information
+  if ($type -eq 'Question') {
+    $buttons = [System.Windows.Forms.MessageBoxButtons]::OKCancel
+    $icon = [System.Windows.Forms.MessageBoxIcon]::Question
+  }
+  elseif ($type -match 'Warn') {
+    $icon = [System.Windows.Forms.MessageBoxIcon]::Warning
+  }
+  elseif ($type -match 'Error') {
+    $icon = [System.Windows.Forms.MessageBoxIcon]::Error
+  }
+
+  $result = [System.Windows.Forms.MessageBox]::Show($message, 'mpware', $buttons, $icon)
+  if ($result -eq [System.Windows.Forms.DialogResult]::OK) { return 'OK' }
+  return 'Cancel'
+}
+
+function Invoke-MpwareDebloatPreset {
+  param(
+    [ValidateSet('Recommended', 'KeepStore', 'Full')]
+    [string]$Preset
+  )
+
+  $common = @(
+    'Microsoft.BingNews',
+    'Microsoft.BingWeather',
+    'Microsoft.GetHelp',
+    'Microsoft.Getstarted',
+    'Microsoft.MicrosoftOfficeHub',
+    'Microsoft.MicrosoftSolitaireCollection',
+    'Microsoft.People',
+    'Microsoft.PowerAutomateDesktop',
+    'Microsoft.Todos',
+    'Microsoft.WindowsFeedbackHub',
+    'Microsoft.ZuneMusic',
+    'Microsoft.ZuneVideo',
+    'Microsoft.YourPhone',
+    'MicrosoftTeams',
+    'MSTeams'
+  )
+
+  $keepStore = $common + @(
+    'Clipchamp.Clipchamp',
+    'Microsoft.549981C3F5F10',
+    'Microsoft.MixedReality.Portal',
+    'Microsoft.Office.OneNote',
+    'Microsoft.SkypeApp',
+    'Microsoft.WindowsAlarms',
+    'Microsoft.WindowsCamera',
+    'Microsoft.WindowsMaps',
+    'Microsoft.WindowsSoundRecorder'
+  )
+
+  $full = $keepStore + @(
+    'Microsoft.GamingApp',
+    'Microsoft.Xbox.TCUI',
+    'Microsoft.XboxApp',
+    'Microsoft.XboxGameOverlay',
+    'Microsoft.XboxGamingOverlay',
+    'Microsoft.XboxIdentityProvider',
+    'Microsoft.XboxSpeechToTextOverlay'
+  )
+
+  $targets = $common
+  if ($Preset -eq 'KeepStore') { $targets = $keepStore }
+  if ($Preset -eq 'Full') { $targets = $full }
+
+  Write-Status "Running $Preset debloat preset..."
+  foreach ($name in ($targets | Sort-Object -Unique)) {
+    Write-Status "Removing $name"
+    Get-AppxPackage -AllUsers -Name $name -ErrorAction SilentlyContinue |
+      ForEach-Object { Remove-AppxPackage -Package $_.PackageFullName -AllUsers -ErrorAction SilentlyContinue }
+    Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
+      Where-Object { $_.DisplayName -eq $name } |
+      ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }
+  }
+  Write-Status 'Debloat preset finished.' 'Success'
+}
+
+function Show-MpwareCleanup {
+  Add-Type -AssemblyName System.Windows.Forms
+  Add-Type -AssemblyName System.Drawing
+  [System.Windows.Forms.Application]::EnableVisualStyles()
+
+  $form = New-Object System.Windows.Forms.Form
+  $form.Text = 'mpware cleanup'
+  $form.Size = New-Object System.Drawing.Size(420, 430)
+  $form.StartPosition = 'CenterScreen'
+  $form.BackColor = [System.Drawing.Color]::Black
+  $form.ForeColor = [System.Drawing.Color]::White
+  $form.Font = New-Object System.Drawing.Font('Segoe UI', 9)
+
+  $title = New-Object System.Windows.Forms.Label
+  $title.Text = 'Cleanup options'
+  $title.Location = New-Object System.Drawing.Point(18, 16)
+  $title.Size = New-Object System.Drawing.Size(360, 24)
+  $title.ForeColor = [System.Drawing.Color]::White
+  $title.BackColor = [System.Drawing.Color]::Black
+  $title.Font = New-Object System.Drawing.Font('Segoe UI', 11, [System.Drawing.FontStyle]::Bold)
+  $form.Controls.Add($title)
+
+  $list = New-Object System.Windows.Forms.CheckedListBox
+  $list.Location = New-Object System.Drawing.Point(18, 52)
+  $list.Size = New-Object System.Drawing.Size(368, 260)
+  $list.CheckOnClick = $true
+  $list.BackColor = [System.Drawing.Color]::Black
+  $list.ForeColor = [System.Drawing.Color]::White
+  $list.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+  $items = @(
+    'User temp files',
+    'Windows temp files',
+    'Recycle Bin',
+    'Thumbnail cache',
+    'DirectX shader cache',
+    'NVIDIA shader cache',
+    'Delivery Optimization cache',
+    'Windows error reports',
+    'Event Viewer logs'
+  )
+  foreach ($item in $items) { $list.Items.Add($item, $false) | Out-Null }
+  $form.Controls.Add($list)
+
+  $checkAll = Create-ModernButton -Text 'CHECK ALL' -Location (New-Object Drawing.Point(18, 332)) -Size (New-Object Drawing.Size(174, 34))
+  $checkAll.Add_Click({
+      for ($i = 0; $i -lt $list.Items.Count; $i++) {
+        $list.SetItemChecked($i, $true)
+      }
+    })
+  $form.Controls.Add($checkAll)
+
+  $clean = Create-ModernButton -Text 'CLEAN' -Location (New-Object Drawing.Point(212, 332)) -Size (New-Object Drawing.Size(174, 34)) -DialogResult ([System.Windows.Forms.DialogResult]::OK)
+  $form.Controls.Add($clean)
+  $form.AcceptButton = $clean
+
+  if ($form.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+    return
+  }
+
+  foreach ($item in $list.CheckedItems) {
+    Write-Status "Cleaning $item"
+    switch ($item) {
+      'User temp files' {
+        Get-ChildItem -LiteralPath $env:TEMP -Force -ErrorAction SilentlyContinue |
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+      }
+      'Windows temp files' {
+        Get-ChildItem -LiteralPath "$env:SystemRoot\Temp" -Force -ErrorAction SilentlyContinue |
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+      }
+      'Recycle Bin' {
+        Clear-RecycleBin -Force -ErrorAction SilentlyContinue
+      }
+      'Thumbnail cache' {
+        Remove-Item -Path "$env:LocalAppData\Microsoft\Windows\Explorer\thumbcache_*.db" -Force -ErrorAction SilentlyContinue
+      }
+      'DirectX shader cache' {
+        Remove-Item -Path "$env:LocalAppData\D3DSCache\*" -Recurse -Force -ErrorAction SilentlyContinue
+      }
+      'NVIDIA shader cache' {
+        Remove-Item -Path "$env:LocalAppData\NVIDIA\GLCache" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$env:USERPROFILE\AppData\LocalLow\NVIDIA\PerDriverVersion\DXCache" -Recurse -Force -ErrorAction SilentlyContinue
+      }
+      'Delivery Optimization cache' {
+        Remove-Item -Path "$env:SystemRoot\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\*" -Recurse -Force -ErrorAction SilentlyContinue
+      }
+      'Windows error reports' {
+        Remove-Item -Path "$env:ProgramData\Microsoft\Windows\WER\*" -Recurse -Force -ErrorAction SilentlyContinue
+      }
+      'Event Viewer logs' {
+        wevtutil el | ForEach-Object { wevtutil cl "$_" 2>$null }
+      }
+    }
+  }
+  Write-Status 'Cleanup finished.' 'Success'
+}
