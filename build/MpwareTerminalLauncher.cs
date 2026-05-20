@@ -98,7 +98,7 @@ namespace mpwareLauncher
             StackPanel nav = new StackPanel { Margin = new Thickness(16, 8, 16, 0) };
             dock.Children.Add(nav);
             nav.Children.Add(NavButton("Registry Tweaks", ShowRegistryTweaks));
-            nav.Children.Add(NavButton("NVIDIA Driver", ShowNvidiaDriver));
+            nav.Children.Add(NavButton("GPU Driver", ShowGpuDriver));
             nav.Children.Add(NavButton("Programs", ShowPrograms));
             nav.Children.Add(NavButton("Debloater", ShowDebloater));
             nav.Children.Add(NavButton("Cleanup", ShowCleanup));
@@ -319,25 +319,40 @@ namespace mpwareLauncher
             dialog.ShowDialog();
         }
 
-        private void ShowNvidiaDriver(object sender, RoutedEventArgs e)
+        private void ShowGpuDriver(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("NVIDIA DRIVER TOOL", "Latest Game Ready driver install with the bundled NVIDIA Inspector preset.", 720);
+            StackPanel page = BeginPage("GPU DRIVER", "Driver install and vendor settings helpers.", 760);
 
             Border box = Box(_border);
             page.Children.Add(box);
 
             StackPanel stack = new StackPanel { Margin = new Thickness(28) };
             box.Child = stack;
-            stack.Children.Add(SectionTitle("LATEST NVIDIA DRIVER", "Downloads the driver, installs it in the current Windows session, and applies the bundled Inspector preset."));
+            stack.Children.Add(SectionTitle("GPU TOOLS", "Launch the bundled driver and settings scripts from one place."));
             stack.Children.Add(InfoLine("Requires administrator approval."));
-            stack.Children.Add(InfoLine("Uses NvidiaAutoInstall\\DefaultProfile.nip and nvidiaProfileInspector.exe from the runtime folder."));
-            stack.Children.Add(InfoLine("The helper closes automatically after a successful run and stays open only if it needs your attention."));
+            stack.Children.Add(InfoLine("Install GPU Drivers opens the supplied driver install script so you can choose NVIDIA, AMD, or Intel."));
+            stack.Children.Add(InfoLine("NVIDIA Settings and AMD Settings launch the supplied vendor tuning scripts in a matching mpware console style."));
 
-            Button install = ActionButton("DOWNLOAD AND INSTALL LATEST DRIVER", delegate { RunNvidiaDriverInstaller(); }, true);
+            StackPanel buttons = new StackPanel();
+            buttons.Margin = new Thickness(0, 24, 0, 0);
+            stack.Children.Add(buttons);
+
+            Button install = ActionButton("INSTALL GPU DRIVERS", delegate { RunScript(@"GpuTools\Driver Install Latest.ps1"); }, true);
             install.Height = 42;
-            install.Margin = new Thickness(0, 24, 0, 0);
             install.HorizontalAlignment = HorizontalAlignment.Stretch;
-            stack.Children.Add(install);
+            buttons.Children.Add(install);
+
+            Button nvidia = ActionButton("NVIDIA SETTINGS", delegate { RunScript(@"GpuTools\Nvidia Settings.ps1"); }, false);
+            nvidia.Height = 40;
+            nvidia.Margin = new Thickness(0, 12, 0, 0);
+            nvidia.HorizontalAlignment = HorizontalAlignment.Stretch;
+            buttons.Children.Add(nvidia);
+
+            Button amd = ActionButton("AMD SETTINGS", delegate { RunScript(@"GpuTools\Amd Settings.ps1"); }, false);
+            amd.Height = 40;
+            amd.Margin = new Thickness(0, 12, 0, 0);
+            amd.HorizontalAlignment = HorizontalAlignment.Stretch;
+            buttons.Children.Add(amd);
 
             RefreshNav();
         }
@@ -577,7 +592,7 @@ namespace mpwareLauncher
                 "1. Run mpware.exe and approve the Administrator prompt.",
                 "2. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED.",
                 "3. Registry apply opens a progress log, creates a restore point, imports the selected patch, runs the required follow-up actions, and refreshes Explorer and Start.",
-                "4. NVIDIA Driver, Programs, Debloater, and Cleanup each open their own helper window and close automatically after a successful run.",
+                "4. GPU Driver, Programs, Debloater, and Cleanup each open their own helper window and close automatically after a successful run.",
                 "5. If an action fails, the PowerShell window stays open so you can read the error before closing it.",
                 "6. Restart your PC after deeper changes such as drivers, debloat, or larger registry batches."
             }, "");
@@ -697,6 +712,7 @@ namespace mpwareLauncher
             bool applyBlackWallpaper = HasSelectedAction(selected, "black-wallpaper");
             bool applyBlackTaskbar = HasSelectedAction(selected, "black-taskbar") || applyBlackWallpaper;
             bool applyPowerPlan = HasSelectedAction(selected, "ultimate-power-plan");
+            bool applyClearStartPins = HasSelectedAction(selected, "clear-start-pins");
             string escapedRoot = PsEscape(_runtimeRoot ?? "");
             string script =
                 "$ErrorActionPreference='Stop';" +
@@ -718,6 +734,7 @@ namespace mpwareLauncher
                 (applyBlackTaskbar ? ProtectedFollowUpScript("black taskbar accent", BlackTaskbarScript()) : "") +
                 (applyBlackWallpaper ? ProtectedFollowUpScript("solid black desktop background", BlackWallpaperScript()) : "") +
                 (applyPowerPlan ? ProtectedFollowUpScript("bundled mpware powerplan", UltimatePowerPlanScript()) : "") +
+                (applyClearStartPins ? ProtectedFollowUpScript("clearing Start menu pins", ClearStartPinsScript()) : "") +
                 VerifyRegistryScript() +
                 "Write-Host 'mpware: refreshing Explorer and Start surfaces...' -ForegroundColor Cyan;" +
                 "try { Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue } catch { Write-Host ('mpware: shell host refresh skipped: ' + $_.Exception.Message) -ForegroundColor Yellow };" +
@@ -875,46 +892,6 @@ namespace mpwareLauncher
                 "  Write-Host ('mpware: verified ' + $verified + ' registry entries.') -ForegroundColor Green;" +
                 "};" +
                 "";
-        }
-
-        private void RunNvidiaDriverInstaller()
-        {
-            if (!EnsureRuntime())
-            {
-                return;
-            }
-
-            string nvidiaRoot = IOPath.Combine(_runtimeRoot, "NvidiaAutoInstall");
-            string script = IOPath.Combine(nvidiaRoot, "NvidiaAutoinstall.ps1");
-            if (!File.Exists(script))
-            {
-                MessageBox.Show("Missing runtime script: NvidiaAutoInstall\\NvidiaAutoinstall.ps1", "mpware", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            string command =
-                "$ErrorActionPreference='Stop';" +
-                "$ConfirmPreference='None';" +
-                "try {" +
-                "  Set-Location -LiteralPath '" + PsEscape(nvidiaRoot) + "';" +
-                "  $Global:folder='" + PsEscape(_runtimeRoot) + "';" +
-                "  $Global:nvidiaFolder='" + PsEscape(nvidiaRoot) + "';" +
-                "  $Global:sysDrive=$env:SystemDrive.TrimEnd('\\')+'\\';" +
-                "  $Global:tempDir=([System.IO.Path]::GetTempPath()).TrimEnd('\\');" +
-                "  . (Join-Path $Global:folder 'MpwareRuntime.ps1');" +
-                "  if (Get-Command Disable-MpwareConsoleQuickEdit -ErrorAction SilentlyContinue) { Disable-MpwareConsoleQuickEdit };" +
-                "  if (-not (Test-Path -LiteralPath (Join-Path $Global:nvidiaFolder 'DefaultProfile.nip'))) { throw 'DefaultProfile.nip is missing' };" +
-                "  if (-not (Test-Path -LiteralPath (Join-Path $Global:nvidiaFolder 'nvidiaProfileInspector.exe'))) { throw 'nvidiaProfileInspector.exe is missing' };" +
-                "  Write-Host 'mpware: starting NVIDIA driver helper with bundled Inspector profile...' -ForegroundColor Cyan;" +
-                "  & '" + PsEscape(script) + "';" +
-                "  Write-Host 'mpware: NVIDIA helper finished.' -ForegroundColor Green;" +
-                "} catch {" +
-                "  Write-Host ''; Write-Host 'mpware: NVIDIA helper failed:' -ForegroundColor Red;" +
-                "  Write-Host $_.Exception.Message -ForegroundColor Red;" +
-                "  Write-Host ''; Read-Host 'Press Enter to close';" +
-                "}";
-
-            RunElevatedPowerShell(command, "launching NVIDIA driver helper");
         }
 
         private void RunElevatedPowerShell(string script, string log)
@@ -1222,6 +1199,22 @@ namespace mpwareLauncher
                 "if ($LASTEXITCODE -ne 0) { throw 'powercfg failed to activate imported mpware powerplan' };";
         }
 
+        private string ClearStartPinsScript()
+        {
+            return
+                "Write-Host 'mpware: clearing Start menu pinned apps...' -ForegroundColor Cyan;" +
+                "$json='{\"pinnedList\":[]}' ;" +
+                "$userPolicy='HKCU:\\SOFTWARE\\Policies\\Microsoft\\Windows\\Explorer';" +
+                "$devicePolicy='HKLM:\\SOFTWARE\\Microsoft\\PolicyManager\\current\\device\\Start';" +
+                "New-Item -Path $userPolicy,$devicePolicy -Force | Out-Null;" +
+                "Set-ItemProperty -Path $userPolicy -Name 'ConfigureStartPins' -Type String -Value $json -Force;" +
+                "Set-ItemProperty -Path $devicePolicy -Name 'ConfigureStartPins' -Type String -Value $json -Force;" +
+                "Set-ItemProperty -Path $devicePolicy -Name 'ConfigureStartPins_ProviderSet' -Type DWord -Value 1 -Force;" +
+                "try { Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue } catch {};" +
+                "$startState=Join-Path $env:LOCALAPPDATA 'Packages\\Microsoft.Windows.StartMenuExperienceHost_cw5n1h2txyewy\\LocalState';" +
+                "if (Test-Path -LiteralPath $startState) { Get-ChildItem -LiteralPath $startState -Filter 'start*.bin' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue };";
+        }
+
         private string ProtectedFollowUpScript(string label, string script)
         {
             return
@@ -1351,6 +1344,11 @@ namespace mpwareLauncher
             power.Risk = "Moderate";
             power.ActionId = "ultimate-power-plan";
             power.Description = "Imports, renames, and activates the bundled mpware powerplan via powercfg.";
+
+            TweakItem startPins = NewParsedTweak("MANAGED", "Clear pinned apps in Start menu");
+            startPins.Risk = "Moderate";
+            startPins.ActionId = "clear-start-pins";
+            startPins.Description = "Applies the Windows Start pin policy for the current user and clears the cached Start pin database so default pinned apps are removed more reliably.";
         }
 
         private bool HasSelectedAction(List<TweakItem> selected, string actionId)
@@ -1432,6 +1430,8 @@ namespace mpwareLauncher
             string title = tweak.Name.ToLowerInvariant();
             if (String.Equals(tweak.ActionId, "ultimate-power-plan", StringComparison.OrdinalIgnoreCase))
                 return "Imports the bundled .pow file, renames it to mpware powerplan, and activates it without deleting other plans.";
+            if (String.Equals(tweak.ActionId, "clear-start-pins", StringComparison.OrdinalIgnoreCase))
+                return "Applies an empty Start pin policy for the current user and clears the cached Start pin database so the pinned apps area is reset on supported Windows 11 builds.";
             if (String.Equals(tweak.ActionId, "black-wallpaper", StringComparison.OrdinalIgnoreCase))
                 return "Sets the desktop wallpaper to a blank solid black background and refreshes Explorer visuals immediately.";
             if (String.Equals(tweak.ActionId, "black-taskbar", StringComparison.OrdinalIgnoreCase))

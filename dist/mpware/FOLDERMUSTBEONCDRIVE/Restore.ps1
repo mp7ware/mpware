@@ -166,7 +166,10 @@ function Get-MpwareManagedRestoreEntries {
     @{ ProviderPath = 'HKCU:\Software\Microsoft\Windows\DWM'; RegPath = 'HKCU\Software\Microsoft\Windows\DWM'; ValueName = 'ColorPrevalence'; IsDefault = $false },
     @{ ProviderPath = 'HKCU:\Software\Microsoft\Windows\DWM'; RegPath = 'HKCU\Software\Microsoft\Windows\DWM'; ValueName = 'AccentColor'; IsDefault = $false },
     @{ ProviderPath = 'HKCU:\Software\Microsoft\Windows\DWM'; RegPath = 'HKCU\Software\Microsoft\Windows\DWM'; ValueName = 'ColorizationColor'; IsDefault = $false },
-    @{ ProviderPath = 'HKCU:\Software\Microsoft\Windows\DWM'; RegPath = 'HKCU\Software\Microsoft\Windows\DWM'; ValueName = 'ColorizationAfterglow'; IsDefault = $false }
+    @{ ProviderPath = 'HKCU:\Software\Microsoft\Windows\DWM'; RegPath = 'HKCU\Software\Microsoft\Windows\DWM'; ValueName = 'ColorizationAfterglow'; IsDefault = $false },
+    @{ ProviderPath = 'HKCU:\SOFTWARE\Policies\Microsoft\Windows\Explorer'; RegPath = 'HKCU\SOFTWARE\Policies\Microsoft\Windows\Explorer'; ValueName = 'ConfigureStartPins'; IsDefault = $false },
+    @{ ProviderPath = 'HKLM:\SOFTWARE\Microsoft\PolicyManager\current\device\Start'; RegPath = 'HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start'; ValueName = 'ConfigureStartPins'; IsDefault = $false },
+    @{ ProviderPath = 'HKLM:\SOFTWARE\Microsoft\PolicyManager\current\device\Start'; RegPath = 'HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start'; ValueName = 'ConfigureStartPins_ProviderSet'; IsDefault = $false }
   )
 
   return $managed | ForEach-Object { [pscustomobject]$_ }
