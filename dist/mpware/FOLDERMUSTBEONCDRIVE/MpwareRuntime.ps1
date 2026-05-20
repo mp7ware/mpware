@@ -178,7 +178,7 @@ function Install-MpwareBrowser {
 
 function Install-MpwareProgram {
   param(
-    [ValidateSet('NVIDIA App', 'Steam', 'Discord')]
+    [ValidateSet('NVIDIA App', 'Steam', 'Discord', 'Spotify')]
     [string]$Name
   )
 
@@ -196,6 +196,10 @@ function Install-MpwareProgram {
     }
     'Discord' {
       Invoke-MpwareWingetInstall -Id 'Discord.Discord' -DisplayName 'Discord' -FallbackUrl 'https://discord.com/download'
+      return
+    }
+    'Spotify' {
+      Invoke-MpwareWingetInstall -Id 'Spotify.Spotify' -DisplayName 'Spotify' -FallbackUrl 'https://www.spotify.com/download/windows/'
       return
     }
   }
