@@ -12,13 +12,6 @@ if (-not $Global:folder) {
 if (-not $Global:sysDrive) {
   $Global:sysDrive = $env:SystemDrive.TrimEnd('\') + '\'
 }
-if (-not $Global:iconDir) {
-  $Global:iconDir = Join-Path $Global:folder 'mpwareIcons'
-}
-if (-not $Global:customIcon) {
-  $Global:customIcon = Join-Path $Global:iconDir 'mp7.ico'
-}
-    
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
@@ -68,12 +61,6 @@ $form.MaximizeBox = $false
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $form.BackColor = [System.Drawing.Color]::Black
 $form.Font = New-Object System.Drawing.Font('Segoe UI', 9) 
-if ($Global:customIcon -and (Test-Path -LiteralPath $Global:customIcon)) {
-  try {
-    $form.Icon = New-Object System.Drawing.Icon -ArgumentList $Global:customIcon
-  }
-  catch {}
-}
 
 $type = $form.GetType()
 $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)

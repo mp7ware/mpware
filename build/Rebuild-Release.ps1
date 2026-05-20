@@ -68,6 +68,7 @@ try {
     $timerArgs = @(
         '/nologo',
         '/target:winexe',
+        '/reference:System.ServiceProcess.dll',
         "/out:$timerExe",
         $timerSource
     )

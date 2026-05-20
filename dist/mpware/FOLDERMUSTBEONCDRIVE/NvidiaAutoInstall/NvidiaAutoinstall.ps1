@@ -558,7 +558,6 @@ if (!(Check-Internet)) {
     $form.StartPosition = 'CenterScreen'
     $form.BackColor = 'Black'
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-    $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
     $type = $form.GetType()
     $propInfo = $type.GetProperty('DoubleBuffered', [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
@@ -1147,7 +1146,6 @@ if (!(Check-Internet)) {
     $form.Text = 'Post Install Tweaks'
     $form.BackColor = 'Black'
     $form.Font = New-Object System.Drawing.Font('Segoe UI', 8)
-    $form.Icon = New-Object System.Drawing.Icon($Global:customIcon)
 
     $TabControl = New-Object System.Windows.Forms.TabControl
     $TabControl.Location = New-Object System.Drawing.Size(10, 10)
