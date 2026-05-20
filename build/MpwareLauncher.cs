@@ -34,28 +34,32 @@ namespace mpwareLauncher
             }
         }
 
-        internal static string ResolveScriptPath()
+        internal static string ResolveRuntimeRoot()
         {
             string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-            string sidecar = IOPath.Combine(exeDir, "_FOLDERMUSTBEONCDRIVE", "mpware.ps1");
+            string sidecar = IOPath.Combine(exeDir, "FOLDERMUSTBEONCDRIVE");
 
-            if (File.Exists(sidecar))
+            if (Directory.Exists(sidecar) && File.Exists(IOPath.Combine(sidecar, "RegTweaks.txt")))
             {
                 return sidecar;
             }
 
-            return ExtractEmbeddedRuntime();
+            return ExtractEmbeddedRuntimeRoot();
         }
 
         private static int SelfTest()
         {
-            string script = ResolveScriptPath();
-            if (String.IsNullOrWhiteSpace(script) || !File.Exists(script))
+            string root = ResolveRuntimeRoot();
+            if (String.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
             {
                 return 2;
             }
 
-            string root = IOPath.GetDirectoryName(script);
+            if (!File.Exists(IOPath.Combine(root, "RegTweaks.txt")))
+            {
+                return 6;
+            }
+
             if (!File.Exists(IOPath.Combine(root, "zFunctions.psm1")))
             {
                 return 3;
@@ -74,7 +78,7 @@ namespace mpwareLauncher
             return 0;
         }
 
-        private static string ExtractEmbeddedRuntime()
+        private static string ExtractEmbeddedRuntimeRoot()
         {
             Assembly assembly = Assembly.GetExecutingAssembly();
             using (Stream resource = assembly.GetManifestResourceStream(ResourceName))
@@ -100,11 +104,11 @@ namespace mpwareLauncher
 
                 string cacheRoot = IOPath.Combine(localAppData, "mpware", "runtime");
                 string target = IOPath.Combine(cacheRoot, hash);
-                string script = IOPath.Combine(target, "mpware.ps1");
+                string marker = IOPath.Combine(target, "RegTweaks.txt");
 
-                if (File.Exists(script))
+                if (File.Exists(marker))
                 {
-                    return script;
+                    return target;
                 }
 
                 Directory.CreateDirectory(cacheRoot);
@@ -119,7 +123,7 @@ namespace mpwareLauncher
                 ZipFile.ExtractToDirectory(zipPath, target);
                 File.Delete(zipPath);
 
-                return File.Exists(script) ? script : null;
+                return File.Exists(marker) ? target : null;
             }
         }
 
