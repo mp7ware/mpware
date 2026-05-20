@@ -75,6 +75,31 @@ namespace mpwareLauncher
                 return 5;
             }
 
+            if (!File.Exists(IOPath.Combine(root, "TimerResolution", "TimerResolution.exe")))
+            {
+                return 9;
+            }
+
+            if (!File.Exists(IOPath.Combine(root, "mpware powerplan.pow")))
+            {
+                return 10;
+            }
+
+            if (!File.Exists(IOPath.Combine(root, "NvidiaAutoInstall", "NvidiaAutoinstall.ps1")))
+            {
+                return 11;
+            }
+
+            if (!File.Exists(IOPath.Combine(root, "NvidiaAutoInstall", "DefaultProfile.nip")))
+            {
+                return 12;
+            }
+
+            if (!File.Exists(IOPath.Combine(root, "NvidiaAutoInstall", "nvidiaProfileInspector.exe")))
+            {
+                return 13;
+            }
+
             if (!File.Exists(IOPath.Combine(root, "Unpin.ps1")))
             {
                 return 7;
