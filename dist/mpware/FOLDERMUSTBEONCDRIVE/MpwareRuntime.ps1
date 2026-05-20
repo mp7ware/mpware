@@ -42,16 +42,18 @@ function Search-File {
 function Disable-MpwareConsoleQuickEdit {
   try {
     if (-not ('MpwareNative.ConsoleMode' -as [type])) {
-      Add-Type -Namespace MpwareNative -Name ConsoleMode -MemberDefinition @"
+      Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
-public static class ConsoleMode {
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr GetStdHandle(int nStdHandle);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out int lpMode);
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int dwMode);
+namespace MpwareNative {
+  public static class ConsoleMode {
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern IntPtr GetStdHandle(int nStdHandle);
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out int lpMode);
+      [DllImport("kernel32.dll", SetLastError = true)]
+      public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int dwMode);
+  }
 }
 "@
     }
@@ -87,16 +89,6 @@ function Clear-MpwareFolderContents {
     }
 }
 
-function Remove-MpwarePath {
-  param([string]$Path)
-
-  if (-not (Test-Path -Path $Path)) {
-    return
-  }
-
-  Remove-Item -Path $Path -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
-}
-
 function Create-ModernButton {
   param(
     [string]$Text,
@@ -119,31 +111,6 @@ function Create-ModernButton {
   $button.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
   if ($ClickAction) { $button.Add_Click($ClickAction) }
   return $button
-}
-
-function Custom-MsgBox {
-  param(
-    [string]$message,
-    [string]$type = 'None'
-  )
-
-  Add-Type -AssemblyName System.Windows.Forms
-  $buttons = [System.Windows.Forms.MessageBoxButtons]::OK
-  $icon = [System.Windows.Forms.MessageBoxIcon]::Information
-  if ($type -eq 'Question') {
-    $buttons = [System.Windows.Forms.MessageBoxButtons]::OKCancel
-    $icon = [System.Windows.Forms.MessageBoxIcon]::Question
-  }
-  elseif ($type -match 'Warn') {
-    $icon = [System.Windows.Forms.MessageBoxIcon]::Warning
-  }
-  elseif ($type -match 'Error') {
-    $icon = [System.Windows.Forms.MessageBoxIcon]::Error
-  }
-
-  $result = [System.Windows.Forms.MessageBox]::Show($message, 'mpware', $buttons, $icon)
-  if ($result -eq [System.Windows.Forms.DialogResult]::OK) { return 'OK' }
-  return 'Cancel'
 }
 
 function Test-MpwareWinget {
@@ -451,39 +418,6 @@ function Invoke-MpwareDebloatPreset {
   Write-Status 'Debloat preset finished. Restart recommended.' 'Success'
 }
 
-function Clear-MpwareEventLogs {
-  $logs = @(wevtutil.exe el 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-  $cleared = 0
-  $skipped = 0
-
-  foreach ($logName in $logs) {
-    if ($logName -match '/Analytic$' -or $logName -match '/Debug$') {
-      $skipped++
-      continue
-    }
-
-    try {
-      $process = Start-Process -FilePath 'wevtutil.exe' -ArgumentList @('cl', $logName) -WindowStyle Hidden -Wait -PassThru
-      if ($process.ExitCode -eq 0) {
-        $cleared++
-      }
-      else {
-        $skipped++
-      }
-    }
-    catch {
-      $skipped++
-    }
-  }
-
-  if ($cleared -gt 0) {
-    Write-Status "Cleared $cleared Event Viewer log channel(s)." 'Success'
-  }
-  if ($skipped -gt 0) {
-    Write-Status "Skipped $skipped unsupported or protected Event Viewer channel(s)." 'Warn'
-  }
-}
-
 function Show-MpwareCleanup {
   $ConfirmPreference = 'None'
   Disable-MpwareConsoleQuickEdit
@@ -517,14 +451,16 @@ function Show-MpwareCleanup {
   $list.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
   $items = @(
     'User temp files',
+    'Local app temp files',
     'Windows temp files',
+    'Prefetch',
+    'Internet cache',
     'Recycle Bin',
     'Thumbnail cache',
     'DirectX shader cache',
     'NVIDIA shader cache',
     'Delivery Optimization cache',
-    'Windows error reports',
-    'Event Viewer logs'
+    'Windows error reports'
   )
   foreach ($item in $items) { $list.Items.Add($item, $false) | Out-Null }
   $form.Controls.Add($list)
@@ -562,8 +498,17 @@ function Show-MpwareCleanup {
         'User temp files' {
           Clear-MpwareFolderContents -Path $env:TEMP
         }
+        'Local app temp files' {
+          Clear-MpwareFolderContents -Path "$env:LocalAppData\Temp"
+        }
         'Windows temp files' {
           Clear-MpwareFolderContents -Path "$env:SystemRoot\Temp"
+        }
+        'Prefetch' {
+          Clear-MpwareFolderContents -Path "$env:SystemRoot\Prefetch"
+        }
+        'Internet cache' {
+          Clear-MpwareFolderContents -Path "$env:LocalAppData\Microsoft\Windows\INetCache"
         }
         'Recycle Bin' {
           Clear-RecycleBin -Force -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
@@ -572,20 +517,17 @@ function Show-MpwareCleanup {
           Remove-Item -Path "$env:LocalAppData\Microsoft\Windows\Explorer\thumbcache_*.db" -Force -Confirm:$false -ErrorAction SilentlyContinue
         }
         'DirectX shader cache' {
-          Remove-MpwarePath -Path "$env:LocalAppData\D3DSCache\*"
+          Clear-MpwareFolderContents -Path "$env:LocalAppData\D3DSCache"
         }
         'NVIDIA shader cache' {
-          Remove-MpwarePath -Path "$env:LocalAppData\NVIDIA\GLCache"
-          Remove-MpwarePath -Path "$env:USERPROFILE\AppData\LocalLow\NVIDIA\PerDriverVersion\DXCache"
+          Clear-MpwareFolderContents -Path "$env:LocalAppData\NVIDIA\GLCache"
+          Clear-MpwareFolderContents -Path "$env:USERPROFILE\AppData\LocalLow\NVIDIA\PerDriverVersion\DXCache"
         }
         'Delivery Optimization cache' {
-          Remove-MpwarePath -Path "$env:SystemRoot\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\*"
+          Clear-MpwareFolderContents -Path "$env:SystemRoot\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache"
         }
         'Windows error reports' {
-          Remove-MpwarePath -Path "$env:ProgramData\Microsoft\Windows\WER\*"
-        }
-        'Event Viewer logs' {
-          Clear-MpwareEventLogs
+          Clear-MpwareFolderContents -Path "$env:ProgramData\Microsoft\Windows\WER"
         }
       }
     }

@@ -426,14 +426,14 @@ namespace mpwareLauncher
 
         private void ShowCleanup(object sender, RoutedEventArgs e)
         {
-            StackPanel page = BeginPage("CLEANUP", "Simple cache and log cleanup with a visible progress log.", 760);
+            StackPanel page = BeginPage("CLEANUP", "Simple temp and cache cleanup with a visible progress log.", 760);
 
             Border warning = Box(_moderate);
             warning.Margin = new Thickness(0, 0, 0, 22);
             StackPanel warningStack = new StackPanel { Margin = new Thickness(18) };
             warning.Child = warningStack;
-            warningStack.Children.Add(Text("/!\\ Cleanup removes selected caches, logs, and temporary files.", 15, FontWeights.Bold, _moderate));
-            warningStack.Children.Add(Text("The cleanup window is simplified to CHECK ALL and CLEAN. Unsupported Event Viewer channels are skipped automatically.", 11, FontWeights.Bold, _text));
+            warningStack.Children.Add(Text("/!\\ Cleanup removes selected caches and temporary files.", 15, FontWeights.Bold, _moderate));
+            warningStack.Children.Add(Text("The cleanup window is simplified to CHECK ALL and CLEAN. It focuses on temp files, caches, and common leftovers.", 11, FontWeights.Bold, _text));
             page.Children.Add(warning);
 
             Border box = Box(_border);
@@ -576,7 +576,7 @@ namespace mpwareLauncher
             how.Child = AboutPanel("HOW TO USE MPWARE.EXE", new string[] {
                 "1. Run mpware.exe and approve the Administrator prompt.",
                 "2. Registry Tweaks: select individual groups or press SELECT ALL, then press APPLY SELECTED.",
-                "3. Registry apply opens a progress log, creates a restore point, imports the selected patch, runs the required follow-up actions, and restarts Explorer.",
+                "3. Registry apply opens a progress log, creates a restore point, imports the selected patch, runs the required follow-up actions, and refreshes Explorer and Start.",
                 "4. NVIDIA Driver, Programs, Debloater, and Cleanup each open their own helper window and close automatically after a successful run.",
                 "5. If an action fails, the PowerShell window stays open so you can read the error before closing it.",
                 "6. Restart your PC after deeper changes such as drivers, debloat, or larger registry batches."
@@ -719,7 +719,8 @@ namespace mpwareLauncher
                 (applyBlackWallpaper ? ProtectedFollowUpScript("solid black desktop background", BlackWallpaperScript()) : "") +
                 (applyPowerPlan ? ProtectedFollowUpScript("bundled mpware powerplan", UltimatePowerPlanScript()) : "") +
                 VerifyRegistryScript() +
-                "Write-Host 'mpware: restarting Explorer to refresh visible Windows settings...' -ForegroundColor Cyan;" +
+                "Write-Host 'mpware: refreshing Explorer and Start surfaces...' -ForegroundColor Cyan;" +
+                "try { Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue } catch { Write-Host ('mpware: shell host refresh skipped: ' + $_.Exception.Message) -ForegroundColor Yellow };" +
                 "try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; Start-Process explorer.exe } catch { Write-Host ('mpware: explorer restart skipped: ' + $_.Exception.Message) -ForegroundColor Yellow };" +
                 "Remove-Item -LiteralPath $reg,$checks -Force -ErrorAction SilentlyContinue;" +
                 "Write-Host 'mpware: registry tweaks applied. Restart recommended.' -ForegroundColor Green;" +
@@ -939,13 +940,15 @@ namespace mpwareLauncher
                 "$ErrorActionPreference='Continue'" + Environment.NewLine +
                 "try {" + Environment.NewLine +
                 "  if (-not ('MpwareBootstrap.ConsoleMode' -as [type])) {" + Environment.NewLine +
-                "    Add-Type -Namespace MpwareBootstrap -Name ConsoleMode -MemberDefinition @'" + Environment.NewLine +
+                "    Add-Type -TypeDefinition @'" + Environment.NewLine +
                 "using System;" + Environment.NewLine +
                 "using System.Runtime.InteropServices;" + Environment.NewLine +
+                "namespace MpwareBootstrap {" + Environment.NewLine +
                 "public static class ConsoleMode {" + Environment.NewLine +
                 "  [DllImport(\"kernel32.dll\", SetLastError = true)] public static extern IntPtr GetStdHandle(int nStdHandle);" + Environment.NewLine +
                 "  [DllImport(\"kernel32.dll\", SetLastError = true)] public static extern bool GetConsoleMode(IntPtr hConsoleHandle, out int lpMode);" + Environment.NewLine +
                 "  [DllImport(\"kernel32.dll\", SetLastError = true)] public static extern bool SetConsoleMode(IntPtr hConsoleHandle, int dwMode);" + Environment.NewLine +
+                "}" + Environment.NewLine +
                 "}" + Environment.NewLine +
                 "'@" + Environment.NewLine +
                 "  }" + Environment.NewLine +

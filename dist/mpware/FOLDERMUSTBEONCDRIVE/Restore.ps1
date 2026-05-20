@@ -279,6 +279,7 @@ foreach ($entry in $allEntries) {
 Remove-MpwareEmptyRegistryKeys -ProviderPaths $touchedPaths
 
 try {
+  Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue
   Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
   Start-Process explorer.exe
 }
