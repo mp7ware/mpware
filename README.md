@@ -1,10 +1,18 @@
-# mpware
+Use `mpware.exe` as Administrator.
 
-mpware is a Windows 11 optimization and debloat package with a portable dashboard-style `mpware.exe` launcher.
+What it does:
+- applies selected Windows registry tweaks for performance, privacy, visuals, and shell behavior
+- can install GPU drivers and open NVIDIA / AMD settings tools
+- installs common programs like browsers, Steam, Discord, Spotify, and runtimes
+- includes a debloater and cleanup tool
+- can restore registry tweaks you applied with `mpware`
 
-The current release package is:
+How to use it:
+1. Open `mpware.exe`
+2. Go to the tab you want
+3. In `Registry Tweaks`, select the tweaks you want and click `Apply Selected`
+4. Use the other tabs for drivers, programs, cleanup, debloat, or restore
+5. Restart your PC after bigger changes
 
-- `dist/mpware/mpware.exe`
-- `dist/mpware.zip`
-
-The launcher requests Administrator on start. Registry Tweaks create a Windows System Restore point before import, then apply selected registry groups
+Warning:
+Use at your own risk. `mpware` changes Windows settings and may affect stability, performance, software behavior, or data. I do not guarantee and am not responsible for any damage, issues, or data loss.
