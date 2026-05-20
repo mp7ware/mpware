@@ -122,6 +122,395 @@ function Open-MpwareUrl {
   Write-Status "$Label page opened in your browser." 'Success'
 }
 
+function Get-MpwareStateDirectory {
+  $path = Join-Path $env:LOCALAPPDATA 'mpware'
+  New-Item -ItemType Directory -Path $path -Force | Out-Null
+  return $path
+}
+
+function Get-MpwareRegistrySnapshotPath {
+  return Join-Path (Get-MpwareStateDirectory) 'registry-restore-snapshot.json'
+}
+
+function Get-MpwareRegistrySnapshotBackupDirectory {
+  $path = Join-Path (Get-MpwareStateDirectory) 'registry-restore-backups'
+  New-Item -ItemType Directory -Path $path -Force | Out-Null
+  return $path
+}
+
+function Convert-MpwareRegPath {
+  param([string]$RegPath)
+
+  if ([string]::IsNullOrWhiteSpace($RegPath)) {
+    return $null
+  }
+
+  $clean = $RegPath.Trim().Trim('[', ']')
+  if ($clean.StartsWith('-')) {
+    $clean = $clean.Substring(1)
+  }
+
+  $mappings = @(
+    @{ Prefix = 'HKEY_LOCAL_MACHINE\'; Hive = 'HKLM' },
+    @{ Prefix = 'HKLM\'; Hive = 'HKLM' },
+    @{ Prefix = 'HKEY_CURRENT_USER\'; Hive = 'HKCU' },
+    @{ Prefix = 'HKCU\'; Hive = 'HKCU' },
+    @{ Prefix = 'HKEY_CLASSES_ROOT\'; Hive = 'HKCR' },
+    @{ Prefix = 'HKCR\'; Hive = 'HKCR' },
+    @{ Prefix = 'HKEY_USERS\'; Hive = 'HKU' },
+    @{ Prefix = 'HKU\'; Hive = 'HKU' },
+    @{ Prefix = 'HKEY_CURRENT_CONFIG\'; Hive = 'HKCC' },
+    @{ Prefix = 'HKCC\'; Hive = 'HKCC' }
+  )
+
+  foreach ($mapping in $mappings) {
+    if ($clean.StartsWith($mapping.Prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+      $subKey = $clean.Substring($mapping.Prefix.Length)
+      return [pscustomobject]@{
+        Hive         = $mapping.Hive
+        SubKey       = $subKey
+        ProviderPath = '{0}:\{1}' -f $mapping.Hive, $subKey
+        RegPath      = '{0}\{1}' -f $mapping.Hive, $subKey
+      }
+    }
+  }
+
+  return $null
+}
+
+function Get-MpwareRegistryValueSnapshot {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RegPath,
+    [string]$ValueName = ''
+  )
+
+  $converted = Convert-MpwareRegPath -RegPath $RegPath
+  if (-not $converted) {
+    return $null
+  }
+
+  $isDefault = [string]::IsNullOrWhiteSpace($ValueName)
+  $normalizedName = if ($isDefault) { '' } else { $ValueName }
+
+  if (-not (Test-Path -LiteralPath $converted.ProviderPath)) {
+    return [pscustomobject]@{
+      RegPath      = $converted.RegPath
+      ProviderPath = $converted.ProviderPath
+      ValueName    = $normalizedName
+      IsDefault    = $isDefault
+      Existed      = $false
+      Kind         = ''
+      Data         = $null
+    }
+  }
+
+  $item = Get-Item -LiteralPath $converted.ProviderPath -ErrorAction SilentlyContinue
+  if (-not $item) {
+    return [pscustomobject]@{
+      RegPath      = $converted.RegPath
+      ProviderPath = $converted.ProviderPath
+      ValueName    = $normalizedName
+      IsDefault    = $isDefault
+      Existed      = $false
+      Kind         = ''
+      Data         = $null
+    }
+  }
+
+  $sentinel = New-Object object
+  $lookupName = if ($isDefault) { '' } else { $normalizedName }
+  $currentValue = $item.GetValue($lookupName, $sentinel, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+  if ([object]::ReferenceEquals($currentValue, $sentinel)) {
+    return [pscustomobject]@{
+      RegPath      = $converted.RegPath
+      ProviderPath = $converted.ProviderPath
+      ValueName    = $normalizedName
+      IsDefault    = $isDefault
+      Existed      = $false
+      Kind         = ''
+      Data         = $null
+    }
+  }
+
+  $kind = $item.GetValueKind($lookupName).ToString()
+  $data = switch ($kind) {
+    'Binary' { [Convert]::ToBase64String([byte[]]$currentValue) }
+    'None' { [Convert]::ToBase64String([byte[]]$currentValue) }
+    'MultiString' { @($currentValue) }
+    default { $currentValue }
+  }
+
+  return [pscustomobject]@{
+    RegPath      = $converted.RegPath
+    ProviderPath = $converted.ProviderPath
+    ValueName    = $normalizedName
+    IsDefault    = $isDefault
+    Existed      = $true
+    Kind         = $kind
+    Data         = $data
+  }
+}
+
+function Save-MpwareRegistrySnapshot {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ChecksPath,
+    [bool]$IncludePowerPlan = $false,
+    [bool]$IncludeStartPins = $false
+  )
+
+  if (-not (Test-Path -LiteralPath $ChecksPath)) {
+    throw "Registry check file was not found: $ChecksPath"
+  }
+
+  $snapshotPath = Get-MpwareRegistrySnapshotPath
+  $backupRoot = Get-MpwareRegistrySnapshotBackupDirectory
+  Remove-Item -LiteralPath $backupRoot -Recurse -Force -ErrorAction SilentlyContinue
+  New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+
+  $values = New-Object System.Collections.Generic.List[object]
+  $deleteKeys = New-Object System.Collections.Generic.List[object]
+  $seenValues = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+  $seenDeleteKeys = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+
+  function Add-MpwareSnapshotValue {
+    param([string]$RegPath, [string]$ValueName = '')
+
+    $normalizedName = if ([string]::IsNullOrWhiteSpace($ValueName)) { '' } else { $ValueName }
+    $id = '{0}|{1}' -f $RegPath, $normalizedName
+    if (-not $seenValues.Add($id)) {
+      return
+    }
+
+    $snapshot = Get-MpwareRegistryValueSnapshot -RegPath $RegPath -ValueName $normalizedName
+    if ($snapshot) {
+      $values.Add($snapshot)
+    }
+  }
+
+  foreach ($row in @(Get-Content -LiteralPath $ChecksPath -ErrorAction Stop)) {
+    $parts = $row -split "`t", 3
+    if ($parts.Count -lt 2) {
+      continue
+    }
+
+    $action = $parts[0]
+    $regPath = $parts[1]
+    $valueName = if ($parts.Count -ge 3) { $parts[2] } else { '' }
+
+    if ([string]::IsNullOrWhiteSpace($regPath)) {
+      continue
+    }
+
+    if ($action -eq 'deletekey') {
+      if (-not $seenDeleteKeys.Add($regPath)) {
+        continue
+      }
+
+      $converted = Convert-MpwareRegPath -RegPath $regPath
+      if (-not $converted) {
+        continue
+      }
+
+      $backupFile = ''
+      $existed = Test-Path -LiteralPath $converted.ProviderPath
+      if ($existed) {
+        $safeName = 'key-' + ([guid]::NewGuid().ToString('N')) + '.reg'
+        $backupFile = Join-Path $backupRoot $safeName
+        $regExe = Join-Path $env:SystemRoot 'System32\reg.exe'
+        $exportProcess = Start-Process -FilePath $regExe -ArgumentList @('export', $converted.RegPath, $backupFile, '/y') -Wait -PassThru -WindowStyle Hidden
+        if ($exportProcess.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $backupFile)) {
+          throw "Failed to back up registry key before apply: $($converted.RegPath)"
+        }
+      }
+
+      $deleteKeys.Add([pscustomobject]@{
+          RegPath      = $converted.RegPath
+          ProviderPath = $converted.ProviderPath
+          Existed      = $existed
+          BackupFile   = $backupFile
+        })
+      continue
+    }
+
+    Add-MpwareSnapshotValue -RegPath $regPath -ValueName $valueName
+  }
+
+  $startPinsState = [pscustomobject]@{
+    Enabled             = $IncludeStartPins
+    LayoutPath          = ''
+    LayoutExisted       = $false
+    LayoutContentBase64 = ''
+  }
+
+  if ($IncludeStartPins) {
+    Add-MpwareSnapshotValue -RegPath 'HKCU\SOFTWARE\Policies\Microsoft\Windows\Explorer' -ValueName 'ConfigureStartPins'
+    Add-MpwareSnapshotValue -RegPath 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Explorer' -ValueName 'ConfigureStartPins'
+    Add-MpwareSnapshotValue -RegPath 'HKCU\SOFTWARE\Microsoft\PolicyManager\current\user\Start' -ValueName 'ConfigureStartPins'
+    Add-MpwareSnapshotValue -RegPath 'HKCU\SOFTWARE\Microsoft\PolicyManager\current\user\Start' -ValueName 'ConfigureStartPins_ProviderSet'
+    Add-MpwareSnapshotValue -RegPath 'HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start' -ValueName 'ConfigureStartPins'
+    Add-MpwareSnapshotValue -RegPath 'HKLM\SOFTWARE\Microsoft\PolicyManager\current\device\Start' -ValueName 'ConfigureStartPins_ProviderSet'
+
+    $layoutPath = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Shell\LayoutModification.json'
+    $startPinsState.LayoutPath = $layoutPath
+    $startPinsState.LayoutExisted = Test-Path -LiteralPath $layoutPath
+    if ($startPinsState.LayoutExisted) {
+      $startPinsState.LayoutContentBase64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($layoutPath))
+    }
+  }
+
+  $powerPlanState = [pscustomobject]@{
+    Enabled    = $IncludePowerPlan
+    ActiveGuid = ''
+  }
+
+  if ($IncludePowerPlan) {
+    $active = powercfg /getactivescheme 2>$null
+    foreach ($line in $active) {
+      if ($line -match '([0-9a-fA-F-]{36})') {
+        $powerPlanState.ActiveGuid = $matches[1]
+        break
+      }
+    }
+  }
+
+  $snapshotValues = if ($values.Count -gt 0) { $values.ToArray() } else { @() }
+  $snapshotDeletedKeys = if ($deleteKeys.Count -gt 0) { $deleteKeys.ToArray() } else { @() }
+
+  $snapshot = [pscustomobject]@{
+    Version        = 1
+    CreatedAt      = (Get-Date).ToString('o')
+    RegistryValues = $snapshotValues
+    DeletedKeys    = $snapshotDeletedKeys
+    Managed     = [pscustomobject]@{
+      StartPins = $startPinsState
+      PowerPlan = $powerPlanState
+    }
+  }
+
+  $snapshot | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $snapshotPath -Encoding UTF8
+  return $snapshotPath
+}
+
+function Convert-MpwareSnapshotData {
+  param([pscustomobject]$Entry)
+
+  switch ($Entry.Kind) {
+    'Binary' { return [Convert]::FromBase64String([string]$Entry.Data) }
+    'None' { return [Convert]::FromBase64String([string]$Entry.Data) }
+    'DWord' { return [int]$Entry.Data }
+    'QWord' { return [long]$Entry.Data }
+    'MultiString' { return @($Entry.Data) }
+    default { return $Entry.Data }
+  }
+}
+
+function Get-MpwareRegistryBaseKey {
+  param([string]$Hive)
+
+  switch ($Hive.ToUpperInvariant()) {
+    'HKLM' { return [Microsoft.Win32.Registry]::LocalMachine }
+    'HKCU' { return [Microsoft.Win32.Registry]::CurrentUser }
+    'HKCR' { return [Microsoft.Win32.Registry]::ClassesRoot }
+    'HKU' { return [Microsoft.Win32.Registry]::Users }
+    'HKCC' { return [Microsoft.Win32.Registry]::CurrentConfig }
+    default { return $null }
+  }
+}
+
+function Restore-MpwareRegistrySnapshot {
+  param(
+    [string]$SnapshotPath = $(Get-MpwareRegistrySnapshotPath)
+  )
+
+  if (-not (Test-Path -LiteralPath $SnapshotPath)) {
+    return $false
+  }
+
+  $snapshot = Get-Content -LiteralPath $SnapshotPath -Raw -ErrorAction Stop | ConvertFrom-Json
+
+  foreach ($keySnapshot in @($snapshot.DeletedKeys)) {
+    if ([string]::IsNullOrWhiteSpace($keySnapshot.RegPath)) {
+      continue
+    }
+
+    if ($keySnapshot.Existed -and -not [string]::IsNullOrWhiteSpace($keySnapshot.BackupFile) -and (Test-Path -LiteralPath $keySnapshot.BackupFile)) {
+      if (Test-Path -LiteralPath $keySnapshot.ProviderPath) {
+        Remove-Item -LiteralPath $keySnapshot.ProviderPath -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+      }
+
+      $regExe = Join-Path $env:SystemRoot 'System32\reg.exe'
+      $importProcess = Start-Process -FilePath $regExe -ArgumentList @('import', [string]$keySnapshot.BackupFile) -Wait -PassThru -WindowStyle Hidden
+      if ($importProcess.ExitCode -ne 0) {
+        throw "Failed to restore registry key backup: $($keySnapshot.RegPath)"
+      }
+    }
+    elseif (-not $keySnapshot.Existed -and (Test-Path -LiteralPath $keySnapshot.ProviderPath)) {
+      Remove-Item -LiteralPath $keySnapshot.ProviderPath -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+    }
+  }
+
+  foreach ($entry in @($snapshot.RegistryValues)) {
+    $converted = Convert-MpwareRegPath -RegPath $entry.RegPath
+    if (-not $converted) {
+      continue
+    }
+
+    if (-not $entry.Existed) {
+      if (Test-Path -LiteralPath $converted.ProviderPath) {
+        $key = (Get-MpwareRegistryBaseKey -Hive $converted.Hive).OpenSubKey($converted.SubKey, $true)
+        if ($key) {
+          $lookupName = if ($entry.IsDefault) { '' } else { [string]$entry.ValueName }
+          try { $key.DeleteValue($lookupName, $false) } catch {}
+          $key.Close()
+        }
+      }
+      continue
+    }
+
+    $baseKey = Get-MpwareRegistryBaseKey -Hive $converted.Hive
+    if (-not $baseKey) {
+      continue
+    }
+
+    $key = $baseKey.CreateSubKey($converted.SubKey)
+    if (-not $key) {
+      throw "Failed to open registry key for restore: $($entry.RegPath)"
+    }
+
+    try {
+      $lookupName = if ($entry.IsDefault) { '' } else { [string]$entry.ValueName }
+      $data = Convert-MpwareSnapshotData -Entry $entry
+      $kindName = if ([string]::IsNullOrWhiteSpace($entry.Kind)) { 'String' } else { [string]$entry.Kind }
+      $kind = [Microsoft.Win32.RegistryValueKind]::$kindName
+      $key.SetValue($lookupName, $data, $kind)
+    }
+    finally {
+      $key.Close()
+    }
+  }
+
+  if ($snapshot.Managed.StartPins.Enabled) {
+    $layoutPath = [string]$snapshot.Managed.StartPins.LayoutPath
+    if (-not [string]::IsNullOrWhiteSpace($layoutPath)) {
+      if ($snapshot.Managed.StartPins.LayoutExisted) {
+        New-Item -ItemType Directory -Path (Split-Path -Path $layoutPath -Parent) -Force | Out-Null
+        [System.IO.File]::WriteAllBytes($layoutPath, [Convert]::FromBase64String([string]$snapshot.Managed.StartPins.LayoutContentBase64))
+      }
+      elseif (Test-Path -LiteralPath $layoutPath) {
+        Remove-Item -LiteralPath $layoutPath -Force -ErrorAction SilentlyContinue
+      }
+    }
+  }
+
+  if ($snapshot.Managed.PowerPlan.Enabled -and -not [string]::IsNullOrWhiteSpace($snapshot.Managed.PowerPlan.ActiveGuid)) {
+    powercfg /setactive ([string]$snapshot.Managed.PowerPlan.ActiveGuid) | Out-Null
+  }
+
+  return $true
+}
+
 function Invoke-MpwareWingetInstall {
   param(
     [Parameter(Mandatory = $true)]

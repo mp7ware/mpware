@@ -263,7 +263,7 @@ $checkbox.Checked = $true
 $form.Controls.Add($checkbox)
 
 $note = New-Object System.Windows.Forms.Label
-$note.Text = 'Delete-only tweaks that removed existing keys cannot be reconstructed automatically.'
+$note.Text = 'mpware restores the last Registry Tweaks snapshot when one is available. If not, it falls back to removing the current tweak values.'
 $note.ForeColor = [System.Drawing.Color]::LightGray
 $note.BackColor = [System.Drawing.Color]::Black
 $note.Location = New-Object System.Drawing.Point(20, 58)
@@ -283,6 +283,36 @@ $form.Dispose()
 
 if ($dialogResult -ne [System.Windows.Forms.DialogResult]::OK -or -not $checked) {
   Write-Status 'Restore cancelled.' 'Warn'
+  return
+}
+
+$usedSnapshot = $false
+if (Get-Command Restore-MpwareRegistrySnapshot -ErrorAction SilentlyContinue) {
+  try {
+    Write-Status 'Checking for a saved restore snapshot...'
+    $usedSnapshot = [bool](Restore-MpwareRegistrySnapshot)
+    if ($usedSnapshot) {
+      Write-Status 'Restored the last saved registry snapshot.' 'Success'
+    }
+    else {
+      Write-Status 'No saved restore snapshot was found. Falling back to direct registry cleanup.' 'Warn'
+    }
+  }
+  catch {
+    Write-Status "Snapshot restore skipped: $($_.Exception.Message)" 'Warn'
+  }
+}
+
+if ($usedSnapshot) {
+  try {
+    Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+    Start-Process explorer.exe
+  }
+  catch {
+  }
+
+  Write-Status 'Registry restore complete.' 'Success'
   return
 }
 
