@@ -356,9 +356,11 @@ namespace mpwareLauncher
             StackPanel stack = new StackPanel { Margin = new Thickness(28) };
             box.Child = stack;
             stack.Children.Add(SectionTitle("GPU TOOLS", "Run the included driver and vendor settings scripts."));
-            stack.Children.Add(InfoLine("Requires administrator approval."));
-            stack.Children.Add(InfoLine("Install GPU Drivers opens the bundled setup script so you can choose NVIDIA, AMD, or Intel."));
-            stack.Children.Add(InfoLine("NVIDIA Settings and AMD Settings open the included vendor tuning scripts in the same mpware console style."));
+            AddInfoLines(
+                stack,
+                "Requires administrator approval.",
+                "Install GPU Drivers opens the bundled setup script so you can choose NVIDIA, AMD, or Intel.",
+                "NVIDIA Settings and AMD Settings open the included vendor tuning scripts in the same mpware console style.");
 
             StackPanel buttons = new StackPanel();
             buttons.Margin = new Thickness(0, 24, 0, 0);
@@ -366,23 +368,9 @@ namespace mpwareLauncher
             buttons.HorizontalAlignment = HorizontalAlignment.Center;
             stack.Children.Add(buttons);
 
-            Button install = ActionButton("INSTALL GPU DRIVERS", delegate { RunScript(@"GpuTools\Driver Install Latest.ps1"); }, true);
-            install.Height = 42;
-            install.Margin = new Thickness(0);
-            install.HorizontalAlignment = HorizontalAlignment.Stretch;
-            buttons.Children.Add(install);
-
-            Button nvidia = ActionButton("NVIDIA SETTINGS", delegate { RunScript(@"GpuTools\Nvidia Settings.ps1"); }, false);
-            nvidia.Height = 40;
-            nvidia.Margin = new Thickness(0, 12, 0, 0);
-            nvidia.HorizontalAlignment = HorizontalAlignment.Stretch;
-            buttons.Children.Add(nvidia);
-
-            Button amd = ActionButton("AMD SETTINGS", delegate { RunScript(@"GpuTools\Amd Settings.ps1"); }, false);
-            amd.Height = 40;
-            amd.Margin = new Thickness(0, 12, 0, 0);
-            amd.HorizontalAlignment = HorizontalAlignment.Stretch;
-            buttons.Children.Add(amd);
+            buttons.Children.Add(BlockButton("INSTALL GPU DRIVERS", delegate { RunScript(@"GpuTools\Driver Install Latest.ps1"); }, true, 42, new Thickness(0)));
+            buttons.Children.Add(BlockButton("NVIDIA SETTINGS", delegate { RunScript(@"GpuTools\Nvidia Settings.ps1"); }, false, 40, new Thickness(0, 12, 0, 0)));
+            buttons.Children.Add(BlockButton("AMD SETTINGS", delegate { RunScript(@"GpuTools\Amd Settings.ps1"); }, false, 40, new Thickness(0, 12, 0, 0)));
 
             RefreshNav();
         }
@@ -398,7 +386,7 @@ namespace mpwareLauncher
             StackPanel browserStack = new StackPanel { Margin = new Thickness(24) };
             browsers.Child = browserStack;
             browserStack.Children.Add(SectionTitle("BROWSERS", "Uses winget when it is available. If it is not, mpware opens the official download page."));
-            browserStack.Children.Add(InfoLine("Each browser installs separately so you can keep the setup simple."));
+            AddInfoLines(browserStack, "Each browser installs separately so you can keep the setup simple.");
             browserStack.Children.Add(BuildProgramsRow(new Button[]
             {
                 InstallCommandButton("INSTALL BRAVE", "Install-MpwareBrowser -Name 'Brave'"),
@@ -413,7 +401,7 @@ namespace mpwareLauncher
             StackPanel appStack = new StackPanel { Margin = new Thickness(24) };
             apps.Child = appStack;
             appStack.Children.Add(SectionTitle("APPS", "Install a few common desktop apps or open the official vendor page when needed."));
-            appStack.Children.Add(InfoLine("NVIDIA App opens the official NVIDIA page. Steam, Discord, and Spotify use winget with an official-site fallback."));
+            AddInfoLines(appStack, "NVIDIA App opens the official NVIDIA page. Steam, Discord, and Spotify use winget with an official-site fallback.");
             appStack.Children.Add(BuildProgramsRow(new Button[]
             {
                 InstallCommandButton("NVIDIA APP", "Install-MpwareProgram -Name 'NVIDIA App'"),
@@ -428,13 +416,8 @@ namespace mpwareLauncher
             StackPanel runtimeStack = new StackPanel { Margin = new Thickness(24) };
             runtimes.Child = runtimeStack;
             runtimeStack.Children.Add(SectionTitle("PACKAGES", "Install the common Windows support runtimes in one pass."));
-            runtimeStack.Children.Add(InfoLine("Includes VC++ 2015+ x64/x86, .NET Desktop Runtime 8, and the DirectX End-User Runtime."));
-
-            Button packageButton = InstallCommandButton("INSTALL VCREDIST + NETRUNTIME + DIRECTX", "Install-MpwarePackages");
-            packageButton.Height = 42;
-            packageButton.Margin = new Thickness(0, 22, 0, 0);
-            packageButton.HorizontalAlignment = HorizontalAlignment.Stretch;
-            runtimeStack.Children.Add(packageButton);
+            AddInfoLines(runtimeStack, "Includes VC++ 2015+ x64/x86, .NET Desktop Runtime 8, and the DirectX End-User Runtime.");
+            runtimeStack.Children.Add(BlockCommandButton("INSTALL VCREDIST + NETRUNTIME + DIRECTX", "Install-MpwarePackages", 42, new Thickness(0, 22, 0, 0)));
 
             RefreshNav();
         }
@@ -488,14 +471,11 @@ namespace mpwareLauncher
             StackPanel stack = new StackPanel { Margin = new Thickness(24) };
             box.Child = stack;
             stack.Children.Add(SectionTitle("CLEANUP", "Choose what to clear, then run it from one compact window."));
-            stack.Children.Add(InfoLine("The cleanup window only has two actions: CHECK ALL and CLEAN."));
-            stack.Children.Add(InfoLine("A restart is optional, but it can help finish clearing locked caches."));
-
-            Button run = ActionButton("OPEN CLEANUP", delegate { RunFunctionWithVisibleConsole("Show-MpwareCleanup"); }, true);
-            run.Height = 40;
-            run.Margin = new Thickness(0, 24, 0, 0);
-            run.HorizontalAlignment = HorizontalAlignment.Stretch;
-            stack.Children.Add(run);
+            AddInfoLines(
+                stack,
+                "The cleanup window only has two actions: CHECK ALL and CLEAN.",
+                "A restart is optional, but it can help finish clearing locked caches.");
+            stack.Children.Add(BlockCommandButton("OPEN CLEANUP", "Show-MpwareCleanup", 40, new Thickness(0, 24, 0, 0)));
 
             RefreshNav();
         }
@@ -510,14 +490,11 @@ namespace mpwareLauncher
             StackPanel stack = new StackPanel { Margin = new Thickness(24) };
             box.Child = stack;
             stack.Children.Add(SectionTitle("RESTORE CENTER", "Open the rollback tool for the current Registry Tweaks bundle."));
-            stack.Children.Add(InfoLine("This removes the registry values added by mpware and then refreshes Explorer and Start."));
-            stack.Children.Add(InfoLine("Debloat removals and cleanup changes still need a manual reinstall or a full Windows restore if you want them undone."));
-
-            Button open = ActionButton("OPEN RESTORE CENTER", delegate { RunScript("Restore.ps1"); }, true);
-            open.Height = 40;
-            open.Margin = new Thickness(0, 24, 0, 0);
-            open.HorizontalAlignment = HorizontalAlignment.Stretch;
-            stack.Children.Add(open);
+            AddInfoLines(
+                stack,
+                "This removes the registry values added by mpware and then refreshes Explorer and Start.",
+                "Debloat removals and cleanup changes still need a manual reinstall or a full Windows restore if you want them undone.");
+            stack.Children.Add(BlockButton("OPEN RESTORE CENTER", delegate { RunScript("Restore.ps1"); }, true, 40, new Thickness(0, 24, 0, 0)));
 
             RefreshNav();
         }
@@ -658,6 +635,14 @@ namespace mpwareLauncher
             TextBlock line = Text("(i) " + text, 11, FontWeights.Bold, _text);
             line.Margin = new Thickness(0, 10, 0, 0);
             return line;
+        }
+
+        private void AddInfoLines(Panel panel, params string[] lines)
+        {
+            foreach (string line in lines)
+            {
+                panel.Children.Add(InfoLine(line));
+            }
         }
 
         private StackPanel SectionTitle(string title, string subtitle)
@@ -1067,6 +1052,20 @@ namespace mpwareLauncher
             button.Margin = new Thickness(8, 0, 0, 0);
             button.Click += handler;
             return button;
+        }
+
+        private Button BlockButton(string text, RoutedEventHandler handler, bool primary, double height, Thickness margin)
+        {
+            Button button = ActionButton(text, handler, primary);
+            button.Height = height;
+            button.Margin = margin;
+            button.HorizontalAlignment = HorizontalAlignment.Stretch;
+            return button;
+        }
+
+        private Button BlockCommandButton(string text, string functionCall, double height, Thickness margin)
+        {
+            return BlockButton(text, delegate { RunFunctionWithVisibleConsole(functionCall); }, true, height, margin);
         }
 
         private Button FlatButton(string text, bool primary)

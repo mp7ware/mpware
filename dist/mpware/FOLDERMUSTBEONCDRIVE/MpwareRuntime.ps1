@@ -118,7 +118,27 @@ function Open-MpwareUrl {
   )
 
   Write-Status "Opening $Label download page..."
-  Start-Process $Url | Out-Null
+  $opened = $false
+  $openAttempts = @(
+    { Start-Process -FilePath 'explorer.exe' -ArgumentList $Url -ErrorAction Stop | Out-Null },
+    { Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', 'start', '', $Url -WindowStyle Hidden -ErrorAction Stop | Out-Null },
+    { Start-Process -FilePath $Url -ErrorAction Stop | Out-Null }
+  )
+
+  foreach ($attempt in $openAttempts) {
+    try {
+      & $attempt
+      $opened = $true
+      break
+    }
+    catch {
+    }
+  }
+
+  if (-not $opened) {
+    throw "Failed to open the $Label download page."
+  }
+
   Write-Status "$Label page opened in your browser." 'Success'
 }
 
@@ -136,6 +156,17 @@ function Get-MpwareRegistrySnapshotBackupDirectory {
   $path = Join-Path (Get-MpwareStateDirectory) 'registry-restore-backups'
   New-Item -ItemType Directory -Path $path -Force | Out-Null
   return $path
+}
+
+function Invoke-MpwareRegExe {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$ArgumentList
+  )
+
+  $regExe = Join-Path $env:SystemRoot 'System32\reg.exe'
+  $process = Start-Process -FilePath $regExe -ArgumentList $ArgumentList -Wait -PassThru -WindowStyle Hidden
+  return $process.ExitCode
 }
 
 function Convert-MpwareRegPath {
@@ -318,9 +349,8 @@ function Save-MpwareRegistrySnapshot {
       if ($existed) {
         $safeName = 'key-' + ([guid]::NewGuid().ToString('N')) + '.reg'
         $backupFile = Join-Path $backupRoot $safeName
-        $regExe = Join-Path $env:SystemRoot 'System32\reg.exe'
-        $exportProcess = Start-Process -FilePath $regExe -ArgumentList @('export', $converted.RegPath, $backupFile, '/y') -Wait -PassThru -WindowStyle Hidden
-        if ($exportProcess.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $backupFile)) {
+        $exitCode = Invoke-MpwareRegExe -ArgumentList @('export', $converted.RegPath, $backupFile, '/y')
+        if ($exitCode -ne 0 -or -not (Test-Path -LiteralPath $backupFile)) {
           throw "Failed to back up registry key before apply: $($converted.RegPath)"
         }
       }
@@ -440,9 +470,8 @@ function Restore-MpwareRegistrySnapshot {
         Remove-Item -LiteralPath $keySnapshot.ProviderPath -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
       }
 
-      $regExe = Join-Path $env:SystemRoot 'System32\reg.exe'
-      $importProcess = Start-Process -FilePath $regExe -ArgumentList @('import', [string]$keySnapshot.BackupFile) -Wait -PassThru -WindowStyle Hidden
-      if ($importProcess.ExitCode -ne 0) {
+      $exitCode = Invoke-MpwareRegExe -ArgumentList @('import', [string]$keySnapshot.BackupFile)
+      if ($exitCode -ne 0) {
         throw "Failed to restore registry key backup: $($keySnapshot.RegPath)"
       }
     }

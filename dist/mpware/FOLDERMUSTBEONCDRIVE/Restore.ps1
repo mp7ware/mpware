@@ -244,6 +244,16 @@ function Remove-MpwareEmptyRegistryKeys {
   }
 }
 
+function Restart-MpwareShell {
+  try {
+    Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+    Start-Process explorer.exe
+  }
+  catch {
+  }
+}
+
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Restore Changes'
 $form.Size = New-Object System.Drawing.Size(470, 190)
@@ -304,14 +314,7 @@ if (Get-Command Restore-MpwareRegistrySnapshot -ErrorAction SilentlyContinue) {
 }
 
 if ($usedSnapshot) {
-  try {
-    Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue
-    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-    Start-Process explorer.exe
-  }
-  catch {
-  }
-
+  Restart-MpwareShell
   Write-Status 'Registry restore complete.' 'Success'
   return
 }
@@ -347,13 +350,7 @@ if (Test-Path -LiteralPath $shellLayout) {
   Remove-Item -LiteralPath $shellLayout -Force -ErrorAction SilentlyContinue
 }
 
-try {
-  Stop-Process -Name StartMenuExperienceHost,ShellExperienceHost -Force -ErrorAction SilentlyContinue
-  Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-  Start-Process explorer.exe
-}
-catch {
-}
+Restart-MpwareShell
 
 Write-Status "Removed $removed registry value(s)." 'Success'
 if ($missing -gt 0) {
